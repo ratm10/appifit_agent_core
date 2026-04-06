@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../did"
+		},
+		{
+			"path": "../../../../../kokonut_order_agent_v2"
+		},
+		{
+			"path": "../../.."
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
+}

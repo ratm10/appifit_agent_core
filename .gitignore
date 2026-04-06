@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# Dart/Flutter
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+build/
+
+# Claude
+.claude/
