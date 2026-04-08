@@ -47,7 +47,7 @@ class AppFitNotifierService {
 
   // Heartbeat (Ghost Connection 감지)
   Timer? _heartbeatTimer;
-  static const Duration _heartbeatInterval = Duration(seconds: 30);
+  static const Duration _heartbeatInterval = Duration(seconds: 60);
   DateTime? _lastMessageAt; // 마지막 메시지 수신 시각
   DateTime? _connectedAt;   // 연결 수립 시각
 
