@@ -2,6 +2,9 @@
 ///
 /// 환경별 API URL 및 설정을 관리합니다.
 class AppFitConfig {
+  /// appfit_core 패키지 버전 (pubspec.yaml과 동기화 필요)
+  static const String packageVersion = '1.0.4';
+
   /// API 환경 (기본값: live)
   static AppFitEnvironment _environment = AppFitEnvironment.live;
 
@@ -47,6 +50,7 @@ class AppFitConfig {
     try {
       return '''
 AppFit API 설정:
+- AppFit Core v$packageVersion
 - 환경: ${_environment.name}
 - Base URL: $baseUrl
 - WebSocket URL: $websocketUrl
