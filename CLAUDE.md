@@ -136,7 +136,9 @@ appfit_core/lib/
 
 ### 알려진 한계
 
-- **동시 401 응답 시 토큰 재발급 중복**: `AppFitDioProvider`는 401 응답마다 `tokenManager.getValidToken()`을 호출하지만, 갱신 중복을 직렬화하는 뮤텍스/`Completer` 가드가 없습니다. 다수 요청이 동시에 401을 받으면 같은 순간 여러 개의 로그인 요청이 발생할 수 있으므로, 대량 병렬 요청 경로는 소비자 앱에서 직렬화하거나 사전에 토큰 유효성을 확보한 뒤 호출하는 것을 권장합니다.
+- **동시 401 응답 시 토큰 재발급**: v1.0.5부터 `AppFitTokenManager`가 `_refreshingFuture`로 발급을 직렬화하여 동시에 401을 받은 여러 요청이 하나의 로그인 API 호출을 공유합니다. 또한 `AppFitDioProvider`는 동일 요청당 401 재시도를 1회로 제한합니다(`RequestOptions.extra['_appfit_retried']`). 다만 `clearToken()` 호출 타이밍에 따라 재발급 직전에 새 요청이 들어오면 순간적으로 두 번째 갱신이 발생할 수 있으므로, 가능하면 소비자 앱 수준에서도 버스트 요청을 최소화하세요.
+- **비밀번호 평문 보안 저장 가능**: `AppFitTokenManager.savePassword()`는 `FlutterSecureStorage`(iOS Keychain / Android Keystore)에 값을 저장하지만, 저장되는 문자열 자체는 평문입니다. 플랫폼 보안 손상 시 노출될 수 있으므로 장기적으로는 refresh token 같은 passwordless 전략으로 전환하는 것을 권장합니다.
+- **AES 키 길이 검증은 비엄격**: `CryptoUtils._prepareKey`는 32바이트 미달 시 0바이트 패딩, 초과 시 절삭으로 보정합니다. 디버그 빌드에서는 경고 로그가 출력되며, 사전 검증이 필요할 때는 `CryptoUtils.isValidAesKey()`를 사용하세요. 엄격 검증으로의 전환은 운영에서 수신되는 실제 키 길이가 확인된 이후에 고려합니다.
 
 ### 의존성 구조
 

@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'crypto_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../config/appfit_timeouts.dart';
+import 'crypto_utils.dart';
 
 /// 로깅 인터페이스 (프로젝트별 구현)
 abstract class AppFitLogger {
@@ -12,15 +14,18 @@ abstract class AppFitLogger {
 }
 
 /// 기본 로거 (콘솔 출력)
+///
+/// 민감한 정보가 실수로 노출되지 않도록 디버그 빌드에서만 `print`로 출력합니다.
+/// 프로덕션에서는 `SentryAppFitLogger` 같은 전용 로거를 주입하세요.
 class DefaultAppFitLogger implements AppFitLogger {
   @override
   Future<void> log(String message) async {
-    print('[AppFit] $message');
+    if (kDebugMode) print('[AppFit] $message');
   }
 
   @override
   Future<void> error(String message, dynamic error) async {
-    print('[AppFit ERROR] $message: $error');
+    if (kDebugMode) print('[AppFit ERROR] $message: $error');
   }
 }
 
@@ -327,7 +332,12 @@ class AppFitTokenManager {
     }
   }
 
-  /// 비밀번호를 보안 저장소에 저장 (장시간 세션 토큰 갱신용)
+  /// 비밀번호를 보안 저장소에 저장 (장시간 세션 토큰 갱신용).
+  ///
+  /// ⚠️ 보안 경고: `FlutterSecureStorage`가 플랫폼 보안 저장소(iOS Keychain,
+  /// Android Keystore)를 사용하지만 저장되는 값 자체는 평문입니다. 플랫폼 보안이
+  /// 손상(루팅·탈옥·백업 추출 등)되면 노출될 수 있으므로, 장기적으로는 refresh
+  /// token 등의 passwordless 패턴으로 전환하는 것이 바람직합니다.
   Future<void> savePassword(String password) async {
     try {
       await _storage.write(key: _passwordKey, value: password);
@@ -337,7 +347,10 @@ class AppFitTokenManager {
     }
   }
 
-  /// 저장된 비밀번호 조회
+  /// 저장된 비밀번호 조회.
+  ///
+  /// ⚠️ [savePassword]와 동일한 보안 경고가 적용됩니다. 결과를 로그로 남기지
+  /// 말고, 사용 직후 지역 변수에서 소거하거나 가능한 한 메모리 잔존을 최소화하세요.
   Future<String?> loadPassword() async {
     try {
       return await _storage.read(key: _passwordKey);
