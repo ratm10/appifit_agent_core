@@ -22,10 +22,23 @@
 
 - 패키지 이름: `appfit_core`
 - Dart SDK: >=3.1.0 <4.0.0, Flutter: >=3.16.0
-- 현재 버전: `appfit_core/pubspec.yaml`의 version 라인 참조
-- 소비자 앱에서 `path` 의존성으로 참조 (예: `../packages/appfit_core`)
+- 현재 버전: `1.0.4` (`appfit_core/pubspec.yaml` — `tool/sync_version.dart`로 `AppFitConfig.packageVersion` 상수와 자동 동기화됨)
+- 런타임 조회: `AppFitConfig.packageVersion` 상수로 소비자 앱에서도 버전 확인 가능
+- 소비자 앱에서 `path` 의존성으로 참조
 
-**중요**: 이 패키지는 여러 앱에서 공유하는 공통 패키지입니다. 공개 API 변경 시 모든 소비자 앱에 영향을 미치므로, 기존 API 시그니처 변경에 주의하고 하위 호환성을 고려해야 합니다.
+### 소비자 앱 통합
+
+소비자 앱의 `pubspec.yaml`:
+
+```yaml
+dependencies:
+  appfit_core:
+    path: ../packages/appfit_core
+```
+
+현재 이 패키지를 사용하는 앱: `order_agent`, `DID`, `kiosk`.
+
+**중요**: 이 패키지는 여러 앱에서 공유하는 공통 패키지입니다. 공개 API 변경 시 모든 소비자 앱에 영향을 미치므로, 기존 API 시그니처 변경에 주의하고 하위 호환성을 고려해야 합니다. 불가피한 breaking change는 릴리즈 노트에 명시하고 소비자 앱 담당자에게 공지합니다.
 
 ## 빌드 및 실행 명령어
 
@@ -42,6 +55,38 @@ cd appfit_core && flutter test
 # 단일 테스트 파일 실행
 cd appfit_core && flutter test test/<파일_경로>
 ```
+
+## 릴리즈 프로세스
+
+### 버전 규칙
+
+Semver를 따릅니다 (MAJOR.MINOR.PATCH).
+- **MAJOR**: 공개 API 파괴적 변경
+- **MINOR**: 하위 호환 기능 추가
+- **PATCH**: 버그 수정 / 내부 개선
+
+### 배포 절차
+
+1. `appfit_core/pubspec.yaml`의 `version:` 라인을 수정 (예: `1.0.4` → `1.0.5`).
+2. 드라이런으로 검증:
+   ```bash
+   cd appfit_core && bash tool/release.sh --dry-run
+   ```
+3. 이상이 없으면 실제 배포:
+   ```bash
+   cd appfit_core && bash tool/release.sh
+   ```
+4. 공개 API가 변경되었다면 소비자 앱(order_agent, DID, kiosk) 담당자에게 공지합니다.
+
+### `tool/release.sh` 내부 동작
+
+1. 태그 중복 검사 (`v<VERSION>` 이미 존재 시 실패)
+2. `flutter analyze --no-fatal-infos --no-fatal-warnings` (error만 실패)
+3. `dart tool/sync_version.dart` — `pubspec.yaml` 버전을 `AppFitConfig.packageVersion` 상수에 동기화
+4. `git commit -m "chore: release v<VERSION>"`
+5. `git tag v<VERSION>` 생성 후 `origin/main` 및 태그 푸시
+
+**주의**: `version:` 라인만 수정하고 `AppFitConfig.packageVersion`은 수동으로 건드리지 말 것. `sync_version.dart`가 자동 동기화합니다.
 
 ## 아키텍처
 
@@ -80,14 +125,18 @@ appfit_core/lib/
 
 ### 주요 클래스 및 역할
 
-- **AppFitConfig** — 환경 enum (`dev`, `staging`, `live`, `japanLive`) 및 base URL/WebSocket URL 결정
-- **AppFitTokenManager** — JWT 토큰 3단계 전략: 캐시 → 보안 저장소 → 신규 발급. 만료 감지 및 자동 갱신
-- **CryptoUtils** — AES-256-GCM 암호화/복호화, HMAC-SHA512 서명
-- **AppFitDioProvider** — 인증 인터셉터 포함 Dio 인스턴스 생성. 401 시 자동 토큰 갱신 및 재시도
+- **AppFitConfig** — 환경 enum (`dev`, `staging`, `live`, `japanLive`) 및 base URL/WebSocket URL 결정. `packageVersion`, `projectId`, `requestSource` 등 공통 메타데이터 보관
+- **AppFitTokenManager** — JWT 토큰 3단계 전략: 캐시 → 보안 저장소 → 신규 발급. 만료 감지(`TokenInfo.isExpired`)와 만료 임박 판정(`TokenInfo.isExpiringSoon`, 1시간 여유) 제공. 세션 비밀번호 저장/로드/지우기(`savePassword`/`loadPassword`/`clearPassword`)와 프로젝트 자격증명 저장(`saveProjectCredentials`) 및 검증(`validateApiKey`, HMAC-SHA512 서명 사용) 포함
+- **CryptoUtils** — AES-256-GCM 암호화/복호화(키 길이 부족 시 0바이트 패딩), HMAC-SHA512 서명 생성
+- **AppFitDioProvider** — 인증 인터셉터 포함 Dio 인스턴스 생성. 401 시 토큰 클리어 후 재발급·재시도. shopCode는 `options.extra` → 헤더 → 쿼리 파라미터 → body → URL 경로 → `AuthStateProvider.currentStoreId` 순 폴백
 - **ApiRoutes** — 버전별 API 엔드포인트 경로 (`/v0`)
-- **AppFitNotifierService** — WebSocket 연결 관리. 지수 백오프 재연결 (3초→300초), 하트비트 (30초), 네트워크 복구 감지
-- **MonitoringService** — Sentry 싱글톤. 60초 상태 전환 쿨다운, 5분 에러 타입 쿨다운, 플래핑 감지 (5분 내 6회+)
-- **AppFitLogger** — 추상 로거 인터페이스. `SentryAppFitLogger`가 에러만 Sentry 전송
+- **AppFitNotifierService** — WebSocket 연결 관리. 지수 백오프 재연결 (3초→300초, 최대 3회 시도 후 네트워크 복구 이벤트 대기), 하트비트 (60초), Ghost Connection 감지 (마지막 메시지 5분 이상 시 경고), `connectivity_plus` 기반 네트워크 복구 자동 재연결
+- **MonitoringService** — Sentry 싱글톤. 60초 상태 전환 쿨다운, 5분 에러 타입 쿨다운, 플래핑 감지 (5분 내 6회+), 플래핑 진입 시 2분 안정화 기간. 성능 트레이싱·자동 세션 트래킹 비활성 상태로 초기화
+- **AppFitLogger** — 추상 로거 인터페이스. `SentryAppFitLogger`가 기존 로거를 래핑하여 `error()`만 Sentry로 전달
+
+### 알려진 한계
+
+- **동시 401 응답 시 토큰 재발급 중복**: `AppFitDioProvider`는 401 응답마다 `tokenManager.getValidToken()`을 호출하지만, 갱신 중복을 직렬화하는 뮤텍스/`Completer` 가드가 없습니다. 다수 요청이 동시에 401을 받으면 같은 순간 여러 개의 로그인 요청이 발생할 수 있으므로, 대량 병렬 요청 경로는 소비자 앱에서 직렬화하거나 사전에 토큰 유효성을 확보한 뒤 호출하는 것을 권장합니다.
 
 ### 의존성 구조
 
@@ -108,13 +157,66 @@ appfit_core/lib/
 
 모든 공개 API는 `appfit_core.dart`에서 export합니다. 새로운 파일을 추가할 경우 반드시 이 파일에 export 라인을 추가해야 소비자 앱에서 접근 가능합니다.
 
+### 공개 추상 인터페이스 시그니처
+
+소비자 앱이 구현해야 하는 계약입니다. 시그니처가 변경되면 모든 소비자 앱이 영향을 받습니다.
+
+**`AppFitLogger`** — `appfit_core/lib/src/auth/token_manager.dart`
+```dart
+abstract class AppFitLogger {
+  Future<void> log(String message);
+  Future<void> error(String message, dynamic error);
+}
+```
+기본 구현으로 `DefaultAppFitLogger`(콘솔 출력) 제공. 보통 `await` 없이 fire-and-forget으로 호출됩니다.
+
+**`AuthStateProvider`** — `appfit_core/lib/src/http/dio_provider.dart`
+```dart
+abstract class AuthStateProvider {
+  String? get currentStoreId;
+  String? get currentPassword;
+}
+```
+`AppFitDioProvider`에 선택적(`nullable`)으로 주입되어 요청 인터셉터가 shopCode/password를 확보할 때 최종 폴백으로 사용합니다.
+
+**`MonitoringContext`** — `appfit_core/lib/src/monitoring/monitoring_context.dart`
+```dart
+abstract class MonitoringContext {
+  String get storeId;
+  String get storeName;
+  String get appType;
+  String get appVersion;
+  String get buildNumber;
+  String get deviceModel;
+  String get deviceManufacturer;
+  String get environment;
+}
+```
+`MonitoringService.init()` / `updateContext()` 호출 시 Sentry user/tag/context에 매핑됩니다.
+
+### 핵심 설정 상수
+
+| 항목 | 값 | 정의 위치 |
+|---|---|---|
+| `connectTimeout` / `receiveTimeout` | 15초 | `config/appfit_timeouts.dart` |
+| 소켓 연결 시 폴링 주기 | 60초 | `AppFitSyncIntervals.connectedSeconds` |
+| 소켓 미연결 시 폴링 주기 | 10초 | `AppFitSyncIntervals.disconnectedSeconds` |
+| WebSocket 하트비트 | 60초 | `socket/notifier_service.dart` (`_heartbeatInterval`) |
+| Ghost Connection 경고 임계 | 5분 | `socket/notifier_service.dart` |
+| 재연결 백오프 | 3초 → 300초 (×2 지수), 최대 3회 시도 | `socket/notifier_service.dart` (`_initialDelaySeconds`, `_maxDelaySeconds`, `_maxReconnectAttempts`) |
+| 토큰 만료 임박 여유 | 1시간 | `auth/token_manager.dart` (`TokenInfo.isExpiringSoon`) |
+| Sentry 상태 전환 쿨다운 | 60초 | `monitoring/monitoring_service.dart` (`_transitionCooldown`) |
+| Sentry 에러 타입 쿨다운 | 5분 | `monitoring/monitoring_service.dart` (`_errorCooldown`) |
+| Sentry 플래핑 감지 | 5분 내 6회+ | `monitoring/monitoring_service.dart` (`_flappingThreshold`, `_flappingWindow`) |
+| Sentry 플래핑 안정화 | 2분 | `monitoring/monitoring_service.dart` (`_flappingStabilityDuration`) |
+
 ### 주요 패턴
 
 - **추상 인터페이스**: `AppFitLogger`, `AuthStateProvider`, `MonitoringContext` — 소비자 앱에서 구현
 - **싱글톤**: `OtaUpdateManager`, `MonitoringService` — 앱 생명주기 동안 단일 인스턴스
 - **의존성 주입**: 로거, 인증 상태 제공자 등을 외부에서 주입
 - **데코레이터**: `SentryAppFitLogger`가 기존 로거를 래핑하여 에러만 Sentry로 전송
-- **Riverpod Notifier**: `AppFitNotifierNotifier`로 WebSocket 연결 상태 관리
+- **Riverpod Notifier**: `AppFitNotifierNotifier`로 WebSocket 연결 상태 관리 (현재는 코드 생성 없이 수동 `Notifier` 구현)
 
 ---
 
@@ -164,6 +266,27 @@ appfit_core/lib/
 - **패턴**: AAA(Arrange-Act-Assert) 또는 Given-When-Then 패턴 준수
 - **Mock 선호도**: Mock보다 Fake/Stub 우선 사용, 필요 시 `mocktail` 활용
 - **테스트 실행**: `flutter test` 또는 `flutter test test/<파일_경로>`
+
+#### 현황
+
+- `appfit_core/test/` 디렉토리 **없음** — 현재 단위 테스트 0개
+- `dev_dependencies`에 `mocktail` 미포함 (도입 시 추가 필요)
+
+#### 권장 우선순위 (테스트 구축 시)
+
+1. `auth/token_manager.dart` — 3단계 토큰 전략, 만료 감지
+2. `auth/crypto_utils.dart` — AES-256-GCM 왕복, HMAC-SHA512 서명
+3. `socket/notifier_service.dart` — 지수 백오프, 하트비트, 네트워크 복구 시나리오
+4. `http/dio_provider.dart` — shopCode 폴백 우선순위, 401 재시도 경로
+5. `events/socket_event_payload.dart` — 페이로드 파싱
+6. `monitoring/monitoring_service.dart` — 쿨다운/플래핑 상태머신
+
+### CI/CD 현황
+
+- **GitHub Actions**: `.github/workflows/` 미구성 — PR 자동화 없음
+- **Pre-commit hooks**: 미설정
+- **정적 분석 설정**: `analysis_options.yaml` 미커스터마이즈, `flutter_lints ^3.0.0` 기본값만 사용
+- **권장**: PR 시 `flutter analyze` / `flutter test` 자동 실행 워크플로우 도입 검토
 
 ### 접근성 (A11Y)
 
