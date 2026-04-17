@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../socket/notifier_service.dart';
@@ -213,6 +214,28 @@ class MonitoringService {
           : null,
     );
   }
+
+  /// 리소스 해제 (앱 종료·로그아웃 시 호출).
+  ///
+  /// Flapping 타이머와 쿨다운 맵을 정리하고 초기화 플래그를 재설정해 `init()`을
+  /// 다시 호출할 수 있게 합니다. `Sentry.close()` 는 호출하지 않으므로, 필요 시
+  /// 소비자 앱이 별도로 호출하세요.
+  Future<void> dispose() async {
+    _flappingStabilityTimer?.cancel();
+    _flappingStabilityTimer = null;
+    _recentTransitions.clear();
+    _transitionCooldowns.clear();
+    _skippedCounts.clear();
+    _errorCooldowns.clear();
+    _lastConnectionStatus = null;
+    _isFlapping = false;
+    _flappingTransitionCount = 0;
+    _initialized = false;
+  }
+
+  /// 테스트 전용: 싱글톤 내부 상태를 초기화.
+  @visibleForTesting
+  Future<void> resetForTesting() => dispose();
 
   // --- Private ---
 

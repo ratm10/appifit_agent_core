@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -54,6 +55,12 @@ class AppFitNotifierService {
   // Race condition 방지
   bool _isConnecting = false;
 
+  /// _handleDisconnection 중복 실행 방지 (heartbeat/onError/onDone 동시 호출 가드)
+  bool _isHandlingDisconnection = false;
+
+  /// dispose 이후 이벤트 처리 차단
+  bool _isDisposed = false;
+
   // 연결 정보 캐시 (재연결용)
   String? _cachedShopCode;
   String? _cachedProjectId;
@@ -88,12 +95,34 @@ class AppFitNotifierService {
       : _logger = logger ?? DefaultAppFitLogger();
 
   /// 리소스 해제
-  void dispose() {
-    _connectivitySubscription?.cancel();
+  ///
+  /// WebSocket 리스너를 먼저 완전히 취소한 뒤 StreamController를 닫아
+  /// "close 직후 add" 레이스를 방지합니다.
+  Future<void> dispose() async {
+    if (_isDisposed) return;
+    _isDisposed = true;
+
+    await _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
-    disconnect();
-    _controller.close();
-    _connectionStateController.close();
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
+    await _cleanupConnection();
+
+    // 캐시 정보 초기화
+    _cachedShopCode = null;
+    _cachedProjectId = null;
+    _cachedApiKey = null;
+    _cachedAesKey = null;
+    _hasEverConnected = false;
+
+    if (!_connectionStateController.isClosed) {
+      await _connectionStateController.close();
+    }
+    if (!_controller.isClosed) {
+      await _controller.close();
+    }
   }
 
   /// WebSocket 연결 시작 (파라미터 기반)
@@ -103,6 +132,11 @@ class AppFitNotifierService {
     required String apiKey,
     required String aesKey,
   }) async {
+    if (_isDisposed) {
+      await _logger.log('[Notifier] dispose 이후 connect 무시');
+      return;
+    }
+
     // 이미 같은 정보로 연결되어 있다면 무시
     if (_isConnected && _cachedShopCode == shopCode && _channel != null) {
       await _logger.log('[Notifier] 이미 연결되어 있습니다. (Shop: $shopCode)');
@@ -117,19 +151,20 @@ class AppFitNotifierService {
     _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
 
-    // Connectivity 리스너 시작
-    _initConnectivityListener();
+    // Connectivity 리스너 시작 (이전 구독 완전 정리 후 재등록)
+    await _initConnectivityListener();
 
     await _connectInternal();
   }
 
   /// 내부 연결 로직 (Race condition 방지)
   Future<void> _connectInternal() async {
+    if (_isDisposed) return;
     if (_isConnecting) return; // 중복 연결 시도 차단
     _isConnecting = true;
 
     // 기존 연결 정리
-    _cleanupConnection();
+    await _cleanupConnection();
 
     if (_cachedShopCode == null ||
         _cachedProjectId == null ||
@@ -232,17 +267,20 @@ class AppFitNotifierService {
           : '수신 기록 없음';
 
       if (readyState == null || readyState != WebSocket.open) {
+        // 비정상 — 프로덕션에서도 반드시 로깅 (재연결 진입 사유)
         await _logger.log(
           '[Notifier] Heartbeat: 연결 끊김 감지 → 재연결 '
           '(readyState: $readyStateName, 연결유지: $connectedDurationStr, 마지막수신: $sinceLastMessageStr)',
         );
         _handleDisconnection();
       } else {
-        // 정상 연결 중에도 매 틱 로그 출력
-        await _logger.log(
-          '[Notifier] Heartbeat: 정상 '
-          '(readyState: $readyStateName, 연결유지: $connectedDurationStr, 마지막수신: $sinceLastMessageStr)',
-        );
+        // 정상 heartbeat 로그는 디버그 빌드에서만 출력 (프로덕션 노이즈 억제)
+        if (kDebugMode) {
+          await _logger.log(
+            '[Notifier] Heartbeat: 정상 '
+            '(readyState: $readyStateName, 연결유지: $connectedDurationStr, 마지막수신: $sinceLastMessageStr)',
+          );
+        }
 
         // Ghost Connection 경고: 5분 이상 메시지 없음
         if (sinceLastMessage != null && sinceLastMessage.inMinutes >= 5) {
@@ -288,6 +326,7 @@ class AppFitNotifierService {
 
   /// 메시지 처리
   void _handleMessage(dynamic message) {
+    if (_isDisposed) return;
     _lastMessageAt = DateTime.now();
     try {
       final decoded = jsonDecode(message as String);
@@ -311,15 +350,27 @@ class AppFitNotifierService {
   }
 
   /// 연결 끊김 처리 및 재연결 스케줄링
+  ///
+  /// heartbeat/onError/onDone에서 동시 호출되어도 가드로 한 번만 실행됩니다.
   void _handleDisconnection() {
-    _cleanupConnection();
-    _isConnected = false;
-    _safeAddConnectionState(ConnectionStatus.reconnecting);
-    _scheduleReconnect();
+    if (_isDisposed) return;
+    if (_isHandlingDisconnection) return;
+    _isHandlingDisconnection = true;
+
+    // cleanup은 fire-and-forget — 콜백 컨텍스트(void)에서 호출되므로 await 불가
+    // cancel/close 진행 중에도 _isDisposed·isClosed 가드로 후속 처리 안전
+    // ignore: unawaited_futures
+    _cleanupConnection().whenComplete(() {
+      _isConnected = false;
+      _safeAddConnectionState(ConnectionStatus.reconnecting);
+      _scheduleReconnect();
+      _isHandlingDisconnection = false;
+    });
   }
 
   /// 재연결 스케줄링 (Exponential Backoff)
   void _scheduleReconnect() {
+    if (_isDisposed) return;
     if (_cachedShopCode == null) return; // 연결 정보 없으면 재연결 불가
 
     if (_reconnectAttempts >= _maxReconnectAttempts) {
@@ -343,8 +394,14 @@ class AppFitNotifierService {
   }
 
   /// Connectivity 리스너 초기화 (내부)
-  void _initConnectivityListener() {
-    _connectivitySubscription?.cancel();
+  ///
+  /// 이전 구독의 cancel을 반드시 await하여 listener 중복 등록을 방지합니다.
+  Future<void> _initConnectivityListener() async {
+    await _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
+
+    if (_isDisposed) return;
+
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       (results) {
         if (_cachedShopCode == null) return; // intentional disconnect 후 무시
@@ -365,6 +422,7 @@ class AppFitNotifierService {
   ///
   /// 외부에서도 호출 가능 (앱이 직접 트리거할 경우)
   void notifyNetworkRestored() {
+    if (_isDisposed) return;
     if (_cachedShopCode == null) return;
     if (_isConnected || _isConnecting) return;  // 연결 시도 중에도 무시
     _logger.log('[Notifier] 네트워크 복원 → backoff 초기화 후 즉시 재연결');
@@ -375,23 +433,27 @@ class AppFitNotifierService {
   }
 
   /// 연결 자원 정리
-  void _cleanupConnection() {
+  ///
+  /// socket subscription cancel을 await하여 후속 메시지 유입 차단.
+  Future<void> _cleanupConnection() async {
     _stopHeartbeat();
     _connectedAt = null;
-    _socketSubscription?.cancel();
-    _channel?.sink.close();
+    final sub = _socketSubscription;
+    _socketSubscription = null;
+    await sub?.cancel();
+    await _channel?.sink.close();
     _channel = null;
     _socket = null;
     _isConnected = false;
   }
 
   /// 완전한 연결 종료 (로그아웃 등)
-  void disconnect() {
+  Future<void> disconnect() async {
     _logger.log('[Notifier] 서비스 종료 (Disconnect)');
     _reconnectTimer?.cancel();
-    _connectivitySubscription?.cancel(); // connectivity 리스너 정리
+    await _connectivitySubscription?.cancel(); // connectivity 리스너 정리
     _connectivitySubscription = null;
-    _cleanupConnection();
+    await _cleanupConnection();
     _safeAddConnectionState(ConnectionStatus.disconnected); // 명시적 종료 알림
 
     // 캐시 정보 초기화

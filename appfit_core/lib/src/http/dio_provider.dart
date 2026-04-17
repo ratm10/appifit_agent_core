@@ -47,6 +47,9 @@ class AppFitDioProvider {
   Dio get instance => dio;
 }
 
+/// 재시도 1회 제한 플래그 키 (RequestOptions.extra)
+const String _kRetriedFlag = '_appfit_retried';
+
 /// AppFit 인증 인터셉터
 class _AppFitAuthInterceptor extends Interceptor {
   final AppFitDioProvider provider;
@@ -117,6 +120,15 @@ class _AppFitAuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     // 401 에러 시 토큰 갱신 시도
     if (err.response?.statusCode == 401) {
+      // 이미 한 번 재시도한 요청이면 무한 루프 방지 — 즉시 에러 전파
+      if (err.requestOptions.extra[_kRetriedFlag] == true) {
+        await provider.logger?.error(
+          '[Dio] 401 재시도 후에도 실패: ${err.requestOptions.path}',
+          null,
+        );
+        return handler.next(err);
+      }
+
       await provider.logger?.log('[Dio] 401 인증 오류 - 토큰 갱신 시도');
 
       try {
@@ -141,6 +153,7 @@ class _AppFitAuthInterceptor extends Interceptor {
             return handler.next(err);
           }
 
+          // TokenManager가 동시 발급을 직렬화하므로 여러 401이 동시에 와도 실제 로그인은 1회만 수행됨
           final newToken = await provider.tokenManager.getValidToken(
             shopCode,
             password: password,
@@ -148,6 +161,7 @@ class _AppFitAuthInterceptor extends Interceptor {
 
           // 원래 요청 재시도 (provider.dio 사용 - baseUrl 및 인터셉터 유지)
           final opts = err.requestOptions;
+          opts.extra[_kRetriedFlag] = true;
           opts.headers['Authorization'] = 'Bearer $newToken';
 
           // Project ID 재주입 (예외 처리 포함)

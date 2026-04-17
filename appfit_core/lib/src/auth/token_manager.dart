@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'crypto_utils.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -71,6 +73,9 @@ class AppFitTokenManager {
 
   TokenInfo? _cachedToken;
 
+  /// 동시 갱신 직렬화용 future — 진행 중인 발급이 있으면 후속 요청이 공유
+  Future<String>? _refreshingFuture;
+
   AppFitTokenManager({
     required this.projectId,
     required this.baseUrl,
@@ -79,6 +84,8 @@ class AppFitTokenManager {
 
   /// 유효한 토큰 가져오기 (자동 갱신 포함)
   /// Method 2 (로그인 방식) 사용 시 password 인자가 필요합니다.
+  ///
+  /// 여러 요청이 동시에 만료된 토큰을 가지고 호출해도 내부적으로 발급은 1회만 수행됩니다.
   Future<String> getValidToken(String shopCode, {String? password}) async {
     // 1. 캐시된 토큰 확인
     if (_cachedToken != null && !_cachedToken!.isExpired) {
@@ -94,7 +101,24 @@ class AppFitTokenManager {
       return savedToken.token;
     }
 
-    // 3. 새 토큰 발급
+    // 3. 진행 중인 갱신이 있으면 결과 공유 (동시 401 중복 발급 방지)
+    final inFlight = _refreshingFuture;
+    if (inFlight != null) {
+      await _logger.log('[Token] 기존 발급 요청에 합류');
+      return inFlight;
+    }
+
+    // 4. 새 토큰 발급 — 완료될 때까지 후속 호출이 공유할 수 있도록 저장
+    final future = _issueAndCache(shopCode, password: password);
+    _refreshingFuture = future;
+    try {
+      return await future;
+    } finally {
+      _refreshingFuture = null;
+    }
+  }
+
+  Future<String> _issueAndCache(String shopCode, {String? password}) async {
     await _logger.log('[Token] 새 토큰 발급 (Method 2: 로그인)');
     final newToken = await issueToken(shopCode, password: password);
     await _saveTokenToStorage(newToken);
@@ -150,7 +174,7 @@ class AppFitTokenManager {
       await _logger.error('[Token] 로그인 요청 오류: ${e.message}', null);
       if (e.response != null) {
         await _logger.error('- Error Response: ${e.response?.data}', null);
-        
+
         // 서버 에러 응답의 message 필드 추출
         if (e.response?.data is Map) {
           final data = e.response?.data as Map;

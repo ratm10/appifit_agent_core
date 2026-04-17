@@ -32,9 +32,13 @@ class AppFitNotifierNotifier extends Notifier<ConnectionStatus> {
         MonitoringService.instance.onConnectionStatusChanged(status);
       },
     );
-    ref.onDispose(() {
-      _connectionStateSubscription?.cancel();
-      _coreService.dispose();
+    // dispose 순서:
+    // 1) 상태 스트림 구독 취소 → 이후 state 업데이트 방지
+    // 2) core service dispose() → WebSocket 리스너·타이머 완전 정리 후 컨트롤러 close
+    ref.onDispose(() async {
+      await _connectionStateSubscription?.cancel();
+      _connectionStateSubscription = null;
+      await _coreService.dispose();
     });
     return ConnectionStatus.disconnected;
   }
@@ -52,5 +56,5 @@ class AppFitNotifierNotifier extends Notifier<ConnectionStatus> {
         aesKey: aesKey,
       );
 
-  void disconnect() => _coreService.disconnect();
+  Future<void> disconnect() => _coreService.disconnect();
 }
