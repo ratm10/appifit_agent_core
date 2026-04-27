@@ -132,13 +132,14 @@ appfit_core/lib/
 - **ApiRoutes** — 버전별 API 엔드포인트 경로 (`/v0`)
 - **AppFitNotifierService** — WebSocket 연결 관리. 지수 백오프 재연결 (3초→300초, 최대 3회 시도 후 네트워크 복구 이벤트 대기), 하트비트 (60초), Ghost Connection 감지 (마지막 메시지 5분 이상 시 경고), `connectivity_plus` 기반 네트워크 복구 자동 재연결
 - **MonitoringService** — Sentry 싱글톤. 60초 상태 전환 쿨다운, 5분 에러 타입 쿨다운, 플래핑 감지 (5분 내 6회+), 플래핑 진입 시 2분 안정화 기간. 성능 트레이싱·자동 세션 트래킹 비활성 상태로 초기화
-- **AppFitLogger** — 추상 로거 인터페이스. `SentryAppFitLogger`가 기존 로거를 래핑하여 `error()`만 Sentry로 전달
+- **AppFitLogger** — 추상 로거 인터페이스(`lib/src/logging/appfit_logger.dart`). `log`/`error` 두 메서드만 구현하면 되고, `debug`/`info`/`warn` 은 `AppFitLoggerLevels` 확장이 자동 제공(모두 `log` 위임). `SentryAppFitLogger`가 기존 로거를 래핑하여 `error()`만 Sentry로 전달
 
 ### 알려진 한계
 
 - **동시 401 응답 시 토큰 재발급**: v1.0.5부터 `AppFitTokenManager`가 `_refreshingFuture`로 발급을 직렬화하여 동시에 401을 받은 여러 요청이 하나의 로그인 API 호출을 공유합니다. 또한 `AppFitDioProvider`는 동일 요청당 401 재시도를 1회로 제한합니다(`RequestOptions.extra['_appfit_retried']`). 다만 `clearToken()` 호출 타이밍에 따라 재발급 직전에 새 요청이 들어오면 순간적으로 두 번째 갱신이 발생할 수 있으므로, 가능하면 소비자 앱 수준에서도 버스트 요청을 최소화하세요.
 - **비밀번호 평문 보안 저장 가능**: `AppFitTokenManager.savePassword()`는 `FlutterSecureStorage`(iOS Keychain / Android Keystore)에 값을 저장하지만, 저장되는 문자열 자체는 평문입니다. 플랫폼 보안 손상 시 노출될 수 있으므로 장기적으로는 refresh token 같은 passwordless 전략으로 전환하는 것을 권장합니다.
 - **AES 키 길이 검증은 비엄격**: `CryptoUtils._prepareKey`는 32바이트 미달 시 0바이트 패딩, 초과 시 절삭으로 보정합니다. 디버그 빌드에서는 경고 로그가 출력되며, 사전 검증이 필요할 때는 `CryptoUtils.isValidAesKey()`를 사용하세요. 엄격 검증으로의 전환은 운영에서 수신되는 실제 키 길이가 확인된 이후에 고려합니다.
+- **`SerialAsyncQueue` Deprecated (v1.0.6)**: 패키지 내부 사용처가 없어 `@Deprecated` 마킹되었습니다. 향후 릴리즈에서 제거 예정이므로 사용 중인 소비자 앱은 자체 구현으로 이전을 권장합니다.
 
 ### 의존성 구조
 
@@ -163,16 +164,22 @@ appfit_core/lib/
 
 소비자 앱이 구현해야 하는 계약입니다. 시그니처가 변경되면 모든 소비자 앱이 영향을 받습니다.
 
-**`AppFitLogger`** — `appfit_core/lib/src/auth/token_manager.dart`
+**`AppFitLogger`** — `appfit_core/lib/src/logging/appfit_logger.dart` (v1.0.6+, 이전 위치: `auth/token_manager.dart`)
 ```dart
 abstract class AppFitLogger {
   Future<void> log(String message);
   Future<void> error(String message, dynamic error);
 }
-```
-기본 구현으로 `DefaultAppFitLogger`(콘솔 출력) 제공. 보통 `await` 없이 fire-and-forget으로 호출됩니다.
 
-**`AuthStateProvider`** — `appfit_core/lib/src/http/dio_provider.dart`
+extension AppFitLoggerLevels on AppFitLogger {
+  Future<void> debug(String message); // 'log' 에 위임 ('[DEBUG]' 프리픽스)
+  Future<void> info(String message);  // 'log' 에 위임 (프리픽스 없음)
+  Future<void> warn(String message);  // 'log' 에 위임 ('[WARN]' 프리픽스)
+}
+```
+기본 구현으로 `DefaultAppFitLogger`(콘솔 출력, 디버그 빌드 한정) 제공. 보통 `await` 없이 fire-and-forget으로 호출됩니다. 소비자 구현체는 `log`/`error` 만 override 하면 호환되며, 레벨별 동작을 분기하려면 `log` 안에서 `[DEBUG]`/`[WARN]` 프리픽스를 파싱하세요.
+
+**`AuthStateProvider`** — `appfit_core/lib/src/auth/auth_state_provider.dart` (v1.0.6+, 이전 위치: `http/dio_provider.dart`)
 ```dart
 abstract class AuthStateProvider {
   String? get currentStoreId;
