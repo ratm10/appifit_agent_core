@@ -8,9 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../auth/token_manager.dart'; // AppFitLogger 정의된 곳 (나중에 분리 고려)
 import '../auth/crypto_utils.dart';
 import '../config/appfit_config.dart';
+import '../logging/appfit_logger.dart';
 
 /// WebSocket 연결 상태
 enum ConnectionStatus {

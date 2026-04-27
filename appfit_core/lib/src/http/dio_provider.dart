@@ -1,15 +1,10 @@
 import 'package:dio/dio.dart';
+
+import '../auth/auth_state_provider.dart';
+import '../auth/token_manager.dart';
 import '../config/appfit_config.dart';
 import '../config/appfit_timeouts.dart';
-import '../auth/token_manager.dart';
-
-/// 인증 상태 제공자 인터페이스
-///
-/// 프로젝트별로 현재 로그인된 storeId를 제공해야 합니다.
-abstract class AuthStateProvider {
-  String? get currentStoreId;
-  String? get currentPassword;
-}
+import '../logging/appfit_logger.dart';
 
 /// AppFit Dio Provider
 ///

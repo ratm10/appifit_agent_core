@@ -1,33 +1,11 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/appfit_timeouts.dart';
+import '../logging/appfit_logger.dart';
 import 'crypto_utils.dart';
-
-/// 로깅 인터페이스 (프로젝트별 구현)
-abstract class AppFitLogger {
-  Future<void> log(String message);
-  Future<void> error(String message, dynamic error);
-}
-
-/// 기본 로거 (콘솔 출력)
-///
-/// 민감한 정보가 실수로 노출되지 않도록 디버그 빌드에서만 `print`로 출력합니다.
-/// 프로덕션에서는 `SentryAppFitLogger` 같은 전용 로거를 주입하세요.
-class DefaultAppFitLogger implements AppFitLogger {
-  @override
-  Future<void> log(String message) async {
-    if (kDebugMode) print('[AppFit] $message');
-  }
-
-  @override
-  Future<void> error(String message, dynamic error) async {
-    if (kDebugMode) print('[AppFit ERROR] $message: $error');
-  }
-}
 
 /// JWT 토큰 정보
 class TokenInfo {
@@ -167,7 +145,8 @@ class AppFitTokenManager {
         final data = response.data['data'] as Map<String, dynamic>;
         final tokenInfo = TokenInfo.fromJson(data);
 
-        final daysUntilExpiry = tokenInfo.expiresAt.difference(DateTime.now()).inDays;
+        final daysUntilExpiry =
+            tokenInfo.expiresAt.difference(DateTime.now()).inDays;
         await _logger.log(
           '[Token] 로그인 성공 및 토큰 발급 완료, 만료: ${tokenInfo.expiresAt} (${daysUntilExpiry}일 후)',
         );

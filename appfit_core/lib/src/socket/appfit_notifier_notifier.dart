@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../auth/token_manager.dart';
+
+import '../logging/appfit_logger.dart';
 import '../monitoring/monitoring_service.dart';
 import 'notifier_service.dart';
 

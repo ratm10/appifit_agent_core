@@ -1,4 +1,4 @@
-import '../auth/token_manager.dart';
+import '../logging/appfit_logger.dart';
 import 'monitoring_service.dart';
 
 /// AppFitLogger 구현체 - 기존 로거를 감싸고 오류만 Sentry에 전송

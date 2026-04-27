@@ -8,7 +8,11 @@ export 'src/config/appfit_config.dart';
 export 'src/config/sync_intervals.dart';
 export 'src/config/appfit_timeouts.dart';
 
+// Logging (공통 인터페이스 — 소비자 앱에서 구현)
+export 'src/logging/appfit_logger.dart';
+
 // Auth
+export 'src/auth/auth_state_provider.dart';
 export 'src/auth/token_manager.dart';
 export 'src/auth/crypto_utils.dart';
 
