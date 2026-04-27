@@ -142,7 +142,7 @@ class OtaUpdateManager {
     }
 
     _pollingTimer = Timer.periodic(
-      const Duration(milliseconds: 500),
+      AppFitTimeouts.otaPollingInterval,
       (_) async {
         if (_taskId == null) return;
         try {
@@ -170,7 +170,7 @@ class OtaUpdateManager {
             // running 상태로 100%가 지속되면 complete로 처리 (일부 Android 기기 대응)
             if (progress >= 1.0) {
               runningAt100Count++;
-              if (runningAt100Count >= 4) {
+              if (runningAt100Count >= AppFitTimeouts.otaRunningAt100Threshold) {
                 debugPrint('[OtaUpdateManager] running 100% 지속 → complete 처리');
                 await _triggerInstall();
               }

@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../auth/crypto_utils.dart';
 import '../config/appfit_config.dart';
+import '../config/appfit_timeouts.dart';
 import '../logging/appfit_logger.dart';
 
 /// WebSocket 연결 상태
@@ -195,10 +196,10 @@ class AppFitNotifierService {
           'X-Waldlust-ShopCode': _cachedShopCode!,
           'Origin': baseUrl, // 브라우저 동작 모방을 위해 Origin 추가
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppFitTimeouts.wsConnectTimeout);
 
       // 프로토콜 레벨 ping/pong (서버가 pong 미응답 시 onDone 자동 발화)
-      socket.pingInterval = const Duration(seconds: 25);
+      socket.pingInterval = AppFitTimeouts.wsPingInterval;
 
       // 3. 소켓 및 채널 저장
       _socket = socket;
@@ -282,8 +283,9 @@ class AppFitNotifierService {
           );
         }
 
-        // Ghost Connection 경고: 5분 이상 메시지 없음
-        if (sinceLastMessage != null && sinceLastMessage.inMinutes >= 5) {
+        // Ghost Connection 경고: 일정 시간 이상 메시지 없음
+        if (sinceLastMessage != null &&
+            sinceLastMessage >= AppFitTimeouts.ghostConnectionThreshold) {
           /*await _logger.log(
             '[Notifier] ⚠️ Ghost Connection 의심: ${sinceLastMessage.inMinutes}분간 메시지 없음 '
             '(readyState는 open이지만 데이터 수신 없음)',
