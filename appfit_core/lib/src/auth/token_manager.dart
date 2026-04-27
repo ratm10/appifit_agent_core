@@ -73,9 +73,9 @@ class AppFitTokenManager {
   final String projectId;
   final String baseUrl;
   final AppFitLogger _logger;
-  final FlutterSecureStorage _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  // FlutterSecureStorage v10 부터 EncryptedSharedPreferences 가 deprecated 되어
+  // 옵션을 지정하지 않습니다. 플러그인이 첫 접근 시 기존 값을 자동 마이그레이션합니다.
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   TokenInfo? _cachedToken;
 

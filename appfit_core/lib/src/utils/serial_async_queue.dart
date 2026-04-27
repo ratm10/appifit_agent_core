@@ -9,6 +9,10 @@ import 'dart:collection';
 /// 사용 예:
 /// - 프린트/TTS 출력 순차 처리 (agent: OutputQueueService)
 /// - 애니메이션 순차 처리 (did: PreparingListWidget)
+@Deprecated(
+  '패키지 내부 사용처가 없어 향후 릴리즈에서 제거될 예정입니다. '
+  '필요한 소비자 앱은 자체 구현으로 이전하세요.',
+)
 class SerialAsyncQueue<T> {
   final Queue<T> _queue = Queue();
   bool _isProcessing = false;
