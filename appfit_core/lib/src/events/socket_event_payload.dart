@@ -80,6 +80,56 @@ class SocketEventPayload {
     return asInt != null ? raw.padLeft(padWidth, '0') : raw;
   }
 
+  /// 일부 필드를 교체한 새 인스턴스 반환.
+  ///
+  /// `rawPayload` 는 Map 이므로 깊은 복사 없이 동일 참조가 사용됩니다.
+  SocketEventPayload copyWith({
+    OrderEventType? eventType,
+    String? eventTypeRaw,
+    String? orderId,
+    String? shopOrderNo,
+    String? displayOrderNo,
+    String? shopCode,
+    Map<String, dynamic>? rawPayload,
+  }) {
+    return SocketEventPayload(
+      eventType: eventType ?? this.eventType,
+      eventTypeRaw: eventTypeRaw ?? this.eventTypeRaw,
+      orderId: orderId ?? this.orderId,
+      shopOrderNo: shopOrderNo ?? this.shopOrderNo,
+      displayOrderNo: displayOrderNo ?? this.displayOrderNo,
+      shopCode: shopCode ?? this.shopCode,
+      rawPayload: rawPayload ?? this.rawPayload,
+    );
+  }
+
+  /// 동등성 비교는 식별 필드만 사용합니다.
+  ///
+  /// `rawPayload` 는 `Map<String, dynamic>` 으로 deep equality 비교가 의미 있게
+  /// 동작하지 않으므로 ==/hashCode 에서 제외했습니다. 같은 이벤트 식별 필드를
+  /// 가진 두 페이로드는 동등하게 간주됩니다.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SocketEventPayload &&
+        other.eventType == eventType &&
+        other.eventTypeRaw == eventTypeRaw &&
+        other.orderId == orderId &&
+        other.shopOrderNo == shopOrderNo &&
+        other.displayOrderNo == displayOrderNo &&
+        other.shopCode == shopCode;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        eventType,
+        eventTypeRaw,
+        orderId,
+        shopOrderNo,
+        displayOrderNo,
+        shopCode,
+      );
+
   @override
   String toString() =>
       'SocketEventPayload(event=$eventTypeRaw, orderId=$orderId, shopOrderNo=$shopOrderNo, displayOrderNo=$displayOrderNo, shopCode=$shopCode)';

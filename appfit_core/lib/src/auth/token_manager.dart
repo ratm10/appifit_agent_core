@@ -12,7 +12,7 @@ class TokenInfo {
   final String token;
   final DateTime expiresAt;
 
-  TokenInfo({required this.token, required this.expiresAt});
+  const TokenInfo({required this.token, required this.expiresAt});
 
   factory TokenInfo.fromJson(Map<String, dynamic> json) {
     return TokenInfo(
@@ -34,6 +34,29 @@ class TokenInfo {
   bool get isExpiringSoon {
     return DateTime.now().isAfter(expiresAt.subtract(const Duration(hours: 1)));
   }
+
+  /// 일부 필드를 교체한 새 인스턴스 반환.
+  TokenInfo copyWith({String? token, DateTime? expiresAt}) {
+    return TokenInfo(
+      token: token ?? this.token,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TokenInfo &&
+        other.token == token &&
+        other.expiresAt == expiresAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(token, expiresAt);
+
+  /// 토큰 값은 민감 정보이므로 toString 에 포함하지 않습니다.
+  @override
+  String toString() => 'TokenInfo(expiresAt: $expiresAt)';
 }
 
 /// Waldlust Platform AppFit 토큰 관리자

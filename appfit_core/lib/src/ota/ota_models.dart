@@ -15,6 +15,35 @@ class UpdateInfo {
     required this.hasUpdate,
   });
 
+  /// 일부 필드를 교체한 새 인스턴스 반환.
+  UpdateInfo copyWith({
+    int? currentVersion,
+    int? latestVersion,
+    String? downloadUrl,
+    bool? hasUpdate,
+  }) {
+    return UpdateInfo(
+      currentVersion: currentVersion ?? this.currentVersion,
+      latestVersion: latestVersion ?? this.latestVersion,
+      downloadUrl: downloadUrl ?? this.downloadUrl,
+      hasUpdate: hasUpdate ?? this.hasUpdate,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is UpdateInfo &&
+        other.currentVersion == currentVersion &&
+        other.latestVersion == latestVersion &&
+        other.downloadUrl == downloadUrl &&
+        other.hasUpdate == hasUpdate;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(currentVersion, latestVersion, downloadUrl, hasUpdate);
+
   @override
   String toString() =>
       'UpdateInfo(current=$currentVersion, latest=$latestVersion, hasUpdate=$hasUpdate, url=$downloadUrl)';
@@ -26,4 +55,27 @@ class OtaDownloadEvent {
   final double progress;
 
   const OtaDownloadEvent({required this.status, required this.progress});
+
+  /// 일부 필드를 교체한 새 인스턴스 반환.
+  OtaDownloadEvent copyWith({OtaStatusType? status, double? progress}) {
+    return OtaDownloadEvent(
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is OtaDownloadEvent &&
+        other.status == status &&
+        other.progress == progress;
+  }
+
+  @override
+  int get hashCode => Object.hash(status, progress);
+
+  @override
+  String toString() =>
+      'OtaDownloadEvent(status: ${status.name}, progress: $progress)';
 }
