@@ -29,9 +29,17 @@ export 'src/http/api_routes.dart';
 // Events
 export 'src/events/order_event_types.dart';
 export 'src/events/socket_event_payload.dart';
+export 'src/events/order_event_ignore_policy.dart';
+
+// Cache
+export 'src/cache/processed_order_cache.dart';
+
+// Socket dispatcher
+export 'src/socket/socket_event_dispatcher.dart';
 
 // Utils
 export 'src/utils/serial_async_queue.dart';
+export 'src/utils/batch_merge_buffer.dart';
 
 // OTA
 export 'src/ota/ota_models.dart';
