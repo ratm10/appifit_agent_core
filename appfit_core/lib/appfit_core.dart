@@ -33,6 +33,7 @@ export 'src/events/order_event_ignore_policy.dart';
 
 // Cache
 export 'src/cache/processed_order_cache.dart';
+export 'src/cache/recent_removals_cache.dart';
 
 // Socket dispatcher
 export 'src/socket/socket_event_dispatcher.dart';

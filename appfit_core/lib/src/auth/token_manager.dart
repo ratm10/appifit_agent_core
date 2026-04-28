@@ -383,6 +383,21 @@ class AppFitTokenManager {
     return await _storage.read(key: _appFitProjectId);
   }
 
+  /// 저장된 Project API Key 조회
+  Future<String?> getStoredApiKey() async {
+    return await _storage.read(key: _appFitProjectApiKey);
+  }
+
+  /// Project 자격증명 제거 (환경 전환/로그아웃 시)
+  Future<void> clearProjectCredentials() async {
+    try {
+      await _storage.delete(key: _appFitProjectId);
+      await _storage.delete(key: _appFitProjectApiKey);
+    } catch (e) {
+      await _logger.error('[Token] Project 자격증명 제거 실패: $e', null);
+    }
+  }
+
   /// 토큰 제거 (로그아웃 시)
   Future<void> clearToken() async {
     try {
