@@ -43,7 +43,7 @@ class AppFitNotifierService {
   // 재연결 관련
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 3;
+  static const int _maxReconnectAttempts = 5;
   static const int _initialDelaySeconds = 3;
   static const int _maxDelaySeconds = 300;
 

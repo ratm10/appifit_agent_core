@@ -3,7 +3,7 @@
 /// 환경별 API URL 및 설정을 관리합니다.
 class AppFitConfig {
   /// appfit_core 패키지 버전 (pubspec.yaml과 동기화 필요)
-  static const String packageVersion = '1.0.6';
+  static const String packageVersion = '1.0.9';
 
   /// API 환경 (기본값: live)
   static AppFitEnvironment _environment = AppFitEnvironment.live;

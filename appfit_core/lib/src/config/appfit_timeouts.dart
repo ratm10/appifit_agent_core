@@ -7,10 +7,10 @@ class AppFitTimeouts {
   // --- HTTP ---
 
   /// HTTP 연결 타임아웃 (초).
-  static const int connectTimeoutSeconds = 15;
+  static const int connectTimeoutSeconds = 30;
 
   /// HTTP 응답 타임아웃 (초).
-  static const int receiveTimeoutSeconds = 15;
+  static const int receiveTimeoutSeconds = 30;
 
   /// HTTP 연결 타임아웃 Duration.
   static const Duration connectTimeout =
@@ -23,7 +23,7 @@ class AppFitTimeouts {
   // --- WebSocket ---
 
   /// WebSocket 초기 연결 타임아웃.
-  static const Duration wsConnectTimeout = Duration(seconds: 10);
+  static const Duration wsConnectTimeout = Duration(seconds: 20);
 
   /// WebSocket 프로토콜 ping 주기 (서버 pong 미응답 시 onDone 자동 발화).
   static const Duration wsPingInterval = Duration(seconds: 25);

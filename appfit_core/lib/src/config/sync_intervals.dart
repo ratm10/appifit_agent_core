@@ -8,8 +8,8 @@ class AppFitSyncIntervals {
   /// 소켓 연결 중 폴링 간격 (1분) - 안전망 역할
   static const int connectedSeconds = 60;
 
-  /// 소켓 단절 시 폴링 간격 (10초) - 보완 역할
-  static const int disconnectedSeconds = 10;
+  /// 소켓 단절 시 폴링 간격 (15초) - 보완 역할
+  static const int disconnectedSeconds = 15;
 
   /// 소켓 연결 중 폴링 간격 Duration
   static const Duration connectedInterval = Duration(seconds: connectedSeconds);
