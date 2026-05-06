@@ -140,12 +140,13 @@ abstract class MonitoringContext {
 
 | 항목 | 값 | 정의 위치 |
 |---|---|---|
-| `connectTimeout` / `receiveTimeout` | 15초 | `config/appfit_timeouts.dart` |
+| `connectTimeout` / `receiveTimeout` | 30초 | `config/appfit_timeouts.dart` |
+| WebSocket 초기 연결 타임아웃 | 20초 | `config/appfit_timeouts.dart` (`wsConnectTimeout`) |
 | 소켓 연결 시 폴링 주기 | 60초 | `AppFitSyncIntervals.connectedSeconds` |
-| 소켓 미연결 시 폴링 주기 | 10초 | `AppFitSyncIntervals.disconnectedSeconds` |
+| 소켓 미연결 시 폴링 주기 | 15초 | `AppFitSyncIntervals.disconnectedSeconds` |
 | WebSocket 하트비트 | 60초 | `socket/notifier_service.dart` (`_heartbeatInterval`) |
 | Ghost Connection 경고 임계 | 5분 | `socket/notifier_service.dart` |
-| 재연결 백오프 | 3초 → 300초 (×2 지수), 최대 3회 시도 | `socket/notifier_service.dart` (`_initialDelaySeconds`, `_maxDelaySeconds`, `_maxReconnectAttempts`) |
+| 재연결 백오프 | 3초 → 300초 (×2 지수), 최대 5회 시도 | `socket/notifier_service.dart` (`_initialDelaySeconds`, `_maxDelaySeconds`, `_maxReconnectAttempts`) |
 | 토큰 만료 임박 여유 | 1시간 | `auth/token_manager.dart` (`TokenInfo.isExpiringSoon`) |
 | Sentry 상태 전환 쿨다운 | 60초 | `monitoring/monitoring_service.dart` (`_transitionCooldown`) |
 | Sentry 에러 타입 쿨다운 | 5분 | `monitoring/monitoring_service.dart` (`_errorCooldown`) |
