@@ -12,17 +12,30 @@ class TokenInfo {
   final String token;
   final DateTime expiresAt;
 
-  const TokenInfo({required this.token, required this.expiresAt});
+  /// 토큰이 발급된 매장 식별자. nullable — legacy 토큰(필드 도입 전 발급) 및
+  /// 다른 앱 호환을 위해 optional. mismatch 감지 시 캐시 폐기 기준으로 사용.
+  final String? shopCode;
+
+  const TokenInfo({
+    required this.token,
+    required this.expiresAt,
+    this.shopCode,
+  });
 
   factory TokenInfo.fromJson(Map<String, dynamic> json) {
     return TokenInfo(
       token: json['token'] as String,
       expiresAt: DateTime.parse(json['expiresAt'] as String),
+      shopCode: json['shopCode'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'token': token, 'expiresAt': expiresAt.toIso8601String()};
+    return {
+      'token': token,
+      'expiresAt': expiresAt.toIso8601String(),
+      if (shopCode != null) 'shopCode': shopCode,
+    };
   }
 
   /// 토큰이 만료되었는지 확인 (실제 만료 시각 기준)
@@ -36,10 +49,11 @@ class TokenInfo {
   }
 
   /// 일부 필드를 교체한 새 인스턴스 반환.
-  TokenInfo copyWith({String? token, DateTime? expiresAt}) {
+  TokenInfo copyWith({String? token, DateTime? expiresAt, String? shopCode}) {
     return TokenInfo(
       token: token ?? this.token,
       expiresAt: expiresAt ?? this.expiresAt,
+      shopCode: shopCode ?? this.shopCode,
     );
   }
 
@@ -48,15 +62,16 @@ class TokenInfo {
     if (identical(this, other)) return true;
     return other is TokenInfo &&
         other.token == token &&
-        other.expiresAt == expiresAt;
+        other.expiresAt == expiresAt &&
+        other.shopCode == shopCode;
   }
 
   @override
-  int get hashCode => Object.hash(token, expiresAt);
+  int get hashCode => Object.hash(token, expiresAt, shopCode);
 
   /// 토큰 값은 민감 정보이므로 toString 에 포함하지 않습니다.
   @override
-  String toString() => 'TokenInfo(expiresAt: $expiresAt)';
+  String toString() => 'TokenInfo(expiresAt: $expiresAt, shopCode: $shopCode)';
 }
 
 /// Waldlust Platform AppFit 토큰 관리자
@@ -65,6 +80,7 @@ class TokenInfo {
 class AppFitTokenManager {
   static const String _tokenKey = 'appfit_jwt_token';
   static const String _tokenExpiresKey = 'appfit_jwt_expires';
+  static const String _tokenShopCodeKey = 'appfit_jwt_shop_code';
   static const String _dynamicApiKeyKey = 'appfit_dynamic_api_key';
   static const String _appFitProjectId = 'appfit_project_id';
   static const String _appFitProjectApiKey = 'appfit_project_api_key';
@@ -93,18 +109,33 @@ class AppFitTokenManager {
   ///
   /// 여러 요청이 동시에 만료된 토큰을 가지고 호출해도 내부적으로 발급은 1회만 수행됩니다.
   Future<String> getValidToken(String shopCode, {String? password}) async {
-    // 1. 캐시된 토큰 확인
+    // 1. 캐시된 토큰 확인 — shopCode 일치 + 미만료일 때만 hit.
+    //    다른 매장(prefix) 토큰이 캐시에 남아있으면 폐기 후 새 발급으로 진행.
     if (_cachedToken != null && !_cachedToken!.isExpired) {
-      await _logger.log('[Token] 캐시된 토큰 사용');
-      return _cachedToken!.token;
+      if (_cachedToken!.shopCode == shopCode) {
+        await _logger.log('[Token] 캐시된 토큰 사용 (shopCode=$shopCode)');
+        return _cachedToken!.token;
+      }
+      await _logger.log(
+        '[Token] shopCode mismatch — 메모리 캐시 폐기 '
+        '(cached=${_cachedToken!.shopCode}, requested=$shopCode)',
+      );
+      _cachedToken = null;
     }
 
-    // 2. 저장된 토큰 확인
+    // 2. 저장된 토큰 확인 — 마찬가지로 shopCode 일치 검증.
+    //    legacy 토큰(shopCode==null)도 mismatch로 간주하여 폐기 (1회 재발급 비용으로 마이그레이션).
     final savedToken = await _loadTokenFromStorage();
     if (savedToken != null && !savedToken.isExpired) {
-      await _logger.log('[Token] 저장된 토큰 사용');
-      _cachedToken = savedToken;
-      return savedToken.token;
+      if (savedToken.shopCode == shopCode) {
+        await _logger.log('[Token] 저장된 토큰 사용 (shopCode=$shopCode)');
+        _cachedToken = savedToken;
+        return savedToken.token;
+      }
+      await _logger.log(
+        '[Token] shopCode mismatch — 저장된 토큰 폐기 '
+        '(stored=${savedToken.shopCode ?? "(legacy)"}, requested=$shopCode)',
+      );
     }
 
     // 3. 진행 중인 갱신이 있으면 결과 공유 (동시 401 중복 발급 방지)
@@ -126,7 +157,9 @@ class AppFitTokenManager {
 
   Future<String> _issueAndCache(String shopCode, {String? password}) async {
     await _logger.log('[Token] 새 토큰 발급 (Method 2: 로그인)');
-    final newToken = await issueToken(shopCode, password: password);
+    final issued = await issueToken(shopCode, password: password);
+    // shopCode를 토큰에 바인딩하여 캐시/저장소가 매장 식별자를 보존하게 한다.
+    final newToken = issued.copyWith(shopCode: shopCode);
     await _saveTokenToStorage(newToken);
     _cachedToken = newToken;
     return newToken.token;
@@ -206,6 +239,14 @@ class AppFitTokenManager {
         key: _tokenExpiresKey,
         value: tokenInfo.expiresAt.toIso8601String(),
       );
+      if (tokenInfo.shopCode != null && tokenInfo.shopCode!.isNotEmpty) {
+        await _storage.write(
+          key: _tokenShopCodeKey,
+          value: tokenInfo.shopCode,
+        );
+      } else {
+        await _storage.delete(key: _tokenShopCodeKey);
+      }
       await _logger.log('[Token] 토큰 보안 저장 완료');
     } catch (e) {
       await _logger.error('[Token] 토큰 저장 실패: $e', null);
@@ -217,9 +258,14 @@ class AppFitTokenManager {
     try {
       final token = await _storage.read(key: _tokenKey);
       final expiresStr = await _storage.read(key: _tokenExpiresKey);
+      final storedShopCode = await _storage.read(key: _tokenShopCodeKey);
 
       if (token != null && expiresStr != null) {
-        return TokenInfo(token: token, expiresAt: DateTime.parse(expiresStr));
+        return TokenInfo(
+          token: token,
+          expiresAt: DateTime.parse(expiresStr),
+          shopCode: storedShopCode,
+        );
       }
       return null;
     } catch (e) {
@@ -403,11 +449,26 @@ class AppFitTokenManager {
     try {
       await _storage.delete(key: _tokenKey);
       await _storage.delete(key: _tokenExpiresKey);
+      await _storage.delete(key: _tokenShopCodeKey);
       await _storage.delete(key: _dynamicApiKeyKey);
       _cachedToken = null;
       await _logger.log('[Token] 토큰 보안 제거 완료');
     } catch (e) {
       await _logger.error('[Token] 토큰 제거 실패: $e', null);
+    }
+  }
+
+  /// 저장된 토큰이 어느 매장에 발급된 것인지 조회 (만료 여부와 무관).
+  ///
+  /// 호출자는 새 로그인 시도 직전 이 값으로 prefix 전환을 감지해
+  /// projectId/apiKey/password 등 토큰 외 자격증명까지 함께 정리할 수 있다.
+  /// legacy 토큰(필드 도입 전 발급) 또는 토큰 미보유 시 null 반환.
+  Future<String?> getStoredTokenShopCode() async {
+    try {
+      return await _storage.read(key: _tokenShopCodeKey);
+    } catch (e) {
+      await _logger.error('[Token] shopCode 로드 실패: $e', null);
+      return null;
     }
   }
 }
