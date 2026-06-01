@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'api_http_exception.dart';
 import '../auth/auth_state_provider.dart';
 import '../auth/token_manager.dart';
 import '../config/appfit_config.dart';
@@ -250,10 +251,10 @@ class _AppFitLogInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    logger?.error(
-      '[API 오류] ${err.response?.statusCode ?? '?'} ${err.requestOptions.path}',
-      err.message,
-    );
+    // 서버 본문(code/message)을 추출한 읽기 쉬운 예외로 래핑해 로깅/Sentry 로 전달.
+    // 단, 호출부에는 원본 [DioException] 을 그대로 전파한다(전파 타입 불변).
+    final api = ApiHttpException.fromDio(err);
+    logger?.error('[API 오류] $api', api);
     handler.next(err);
   }
 }

@@ -182,10 +182,18 @@ class MonitoringService {
     StackTrace? stackTrace, {
     String? hint,
     Map<String, dynamic>? extras,
+
+    /// 그룹핑 제어용 fingerprint. 지정 시 Sentry 의 기본 그룹핑 대신 사용.
+    List<String>? fingerprint,
+
+    /// 쿨다운 버킷 키. 미지정 시 `runtimeType` 사용. HTTP 오류처럼 타입이
+    /// 한 종류로 뭉치는 경우, 엔드포인트+상태 단위 키를 넘겨 서로 다른 오류가
+    /// 5분 쿨다운을 공유해 차단되는 문제를 피한다.
+    String? cooldownKey,
   }) {
     if (!_initialized) return;
 
-    final typeKey = exception.runtimeType.toString();
+    final typeKey = cooldownKey ?? exception.runtimeType.toString();
     final now = DateTime.now();
     final lastSent = _errorCooldowns[typeKey];
 
@@ -207,12 +215,37 @@ class MonitoringService {
       exception,
       stackTrace: stackTrace,
       hint: hint != null ? Hint.withMap({'hint': hint}) : null,
-      withScope: extras != null
-          ? (scope) {
-              scope.setContexts('extras', extras);
-            }
-          : null,
+      withScope: (scope) {
+        if (extras != null) {
+          scope.setContexts('extras', extras);
+          // 검색 가능한 태그로 승격 (Sentry 에서 필터/집계 가능)
+          final status = extras['http.status'];
+          final code = extras['server.code'];
+          final path = extras['http.path'];
+          if (status != null) scope.setTag('http.status', '$status');
+          if (code != null) scope.setTag('server.code', '$code');
+          if (path != null) scope.setTag('http.path', '$path');
+        }
+        if (fingerprint != null) scope.fingerprint = fingerprint;
+      },
     );
+  }
+
+  /// 정보성 breadcrumb 추가 — 소비자 앱이 의미 있는 컨텍스트(친절한 메시지 등)를
+  /// 추적 trail 에 남길 때 사용한다. issue 는 생성하지 않는다.
+  void addBreadcrumb(
+    String message, {
+    String category = 'app',
+    Map<String, dynamic>? data,
+    SentryLevel level = SentryLevel.info,
+  }) {
+    if (!_initialized) return;
+    Sentry.addBreadcrumb(Breadcrumb(
+      message: message,
+      category: category,
+      level: level,
+      data: data,
+    ));
   }
 
   /// 리소스 해제 (앱 종료·로그아웃 시 호출).

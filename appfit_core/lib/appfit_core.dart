@@ -18,6 +18,7 @@ export 'src/auth/crypto_utils.dart';
 
 // HTTP
 export 'src/http/dio_provider.dart';
+export 'src/http/api_http_exception.dart';
 
 // Socket
 export 'src/socket/notifier_service.dart';
