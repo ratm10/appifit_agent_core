@@ -3,7 +3,38 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.10 (현재) — 토큰 캐시 shopCode 격리
+## v1.0.12 (현재) — 토큰 발급 매장 격리 보강 + 테스트 안전망
+
+### Fixed
+- `AppFitTokenManager.getValidToken()`: 진행 중(in-flight) 토큰 발급에 다른
+  shopCode 요청이 무조건 합류해 남의 매장 토큰을 받던 문제 수정. shopCode 가
+  일치할 때만 합류하고, 불일치 시 진행 중 발급 완료를 기다린 뒤 자기 shopCode
+  로 새로 발급. 동일 shopCode 동시 요청의 "발급 1회" 보장은 유지.
+- `AppFitConfig.packageVersion` 이 1.0.10 으로 남아 있던 동기화 누락 교정
+  (v1.0.11 태깅 시 sync_version 단계 누락 추정).
+
+### Added
+- `AppFitNotifierService` 생성자에 optional `connector` 파라미터
+  (`AppFitWebSocketConnector` typedef) — 테스트에서 실제 네트워크 없이 재연결
+  상태머신을 검증하기 위한 seam. 기본값은 기존 `WebSocket.connect` 와 100% 동일
+  (하위 호환, 기존 호출부 영향 없음).
+- characterization 테스트 66케이스 추가 (CryptoUtils AES-GCM/HMAC,
+  ApiHttpException, Dio 401 토큰갱신 재시도, NotifierService 재연결 백오프) —
+  총 100케이스.
+
+### Changed
+- `analysis_options.yaml` 도입 (flutter_lints + always_use_package_imports),
+  상대 import 27건을 package: 로 전환 등 lint 위반 31건 클린업.
+- `tool/release.sh` 에 `flutter test` 게이트 추가 ([2/6]) — 테스트 실패 시
+  태그 push 전에 릴리즈 중단.
+
+## v1.0.11 — API 오류 모니터링 가독성 보완
+
+### Changed
+- API 오류의 Sentry 전송 가독성·추적성 보완 (`ApiHttpException` fingerprint /
+  extras 정비). (소급 기록 — 태깅 당시 CHANGELOG 누락)
+
+## v1.0.10 — 토큰 캐시 shopCode 격리
 
 ### Fixed
 - `AppFitTokenManager.getValidToken()`이 메모리·SecureStorage 캐시를 사용할 때
