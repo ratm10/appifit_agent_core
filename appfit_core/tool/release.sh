@@ -28,17 +28,22 @@ if git tag --list | grep -q "^${TAG}$"; then
 fi
 
 # 3. flutter analyze (info/warning은 허용, error만 실패)
-echo "[1/5] flutter analyze..."
+echo "[1/6] flutter analyze..."
 flutter analyze --no-fatal-infos --no-fatal-warnings
 echo ""
 
-# 4. 버전 동기화 (packageVersion 상수 ← pubspec.yaml)
-echo "[2/5] 버전 동기화..."
+# 4. flutter test (실패 시 릴리즈 중단)
+echo "[2/6] flutter test..."
+flutter test
+echo ""
+
+# 5. 버전 동기화 (packageVersion 상수 ← pubspec.yaml)
+echo "[3/6] 버전 동기화..."
 dart tool/sync_version.dart
 echo ""
 
-# 5. 커밋
-echo "[3/5] 커밋..."
+# 6. 커밋
+echo "[4/6] 커밋..."
 git add -A .
 if git diff --cached --quiet; then
   echo "  변경 사항 없음 — 커밋 생략"
@@ -52,8 +57,8 @@ else
 fi
 echo ""
 
-# 6. 태그 생성
-echo "[4/5] 태그 생성..."
+# 7. 태그 생성
+echo "[5/6] 태그 생성..."
 if $DRY_RUN; then
   echo "  [DRY-RUN] git tag $TAG"
 else
@@ -61,8 +66,8 @@ else
 fi
 echo ""
 
-# 7. 푸시
-echo "[5/5] 푸시..."
+# 8. 푸시
+echo "[6/6] 푸시..."
 if $DRY_RUN; then
   echo "  [DRY-RUN] git push origin main"
   echo "  [DRY-RUN] git push origin $TAG"

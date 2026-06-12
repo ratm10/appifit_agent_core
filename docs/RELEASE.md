@@ -54,9 +54,10 @@ cd appfit_core && flutter test test/<파일_경로>
 
 1. **태그 중복 검사** — `v<VERSION>` 태그가 이미 존재하면 실패
 2. **`flutter analyze --no-fatal-infos --no-fatal-warnings`** — error만 실패 처리
-3. **`dart tool/sync_version.dart`** — `pubspec.yaml`의 `version:`을 `AppFitConfig.packageVersion` 상수에 자동 동기화
-4. **`git commit -m "chore: release v<VERSION>"`**
-5. **`git tag v<VERSION>` 생성 후 `origin/main` 및 태그 push**
+3. **`flutter test`** — 단위 테스트 1개라도 실패하면 릴리즈 중단
+4. **`dart tool/sync_version.dart`** — `pubspec.yaml`의 `version:`을 `AppFitConfig.packageVersion` 상수에 자동 동기화
+5. **`git commit -m "chore: release v<VERSION>"`**
+6. **`git tag v<VERSION>` 생성 후 `origin/main` 및 태그 push**
 
 ## 비가역성 경고
 
