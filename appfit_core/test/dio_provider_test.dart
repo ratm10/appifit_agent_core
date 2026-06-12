@@ -354,6 +354,7 @@ void main() {
       expect(await first, 'T-1');
       expect(await second, 'T-1');
       expect(tm.issueCalls, 1);
+      expect(tm.issuedShopCodes, ['SHOP_A']);
     });
 
     test('발급 완료 후 같은 shopCode 호출은 캐시를 사용한다 (추가 발급 없음)', () async {
@@ -383,9 +384,9 @@ void main() {
       expect(tm.issuedShopCodes, ['SHOP_A', 'SHOP_B']);
     });
 
-    test('현재 동작 고정(버그 의심): 다른 shopCode 호출도 진행 중 발급에 합류해 남의 토큰을 받는다', () async {
-      // in-flight 합류(_refreshingFuture) 시 shopCode 일치 검증이 없어
-      // SHOP_B 요청이 SHOP_A 용으로 발급 중인 토큰을 그대로 돌려받는다.
+    test('다른 shopCode 호출은 진행 중 발급에 합류하지 않고 자기 토큰을 새로 발급받는다', () async {
+      // in-flight 합류는 shopCode 가 일치할 때만 — SHOP_B 는 SHOP_A 발급의
+      // 완료를 기다린 뒤 자기 shopCode 로 새로 발급받는다.
       final tm = _GatedTokenManager();
 
       final first = tm.getValidToken('SHOP_A', password: 'pw');
@@ -393,12 +394,34 @@ void main() {
 
       final second = tm.getValidToken('SHOP_B', password: 'pw');
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(tm.issueCalls, 1, reason: 'SHOP_B 용 발급이 일어나지 않음');
+      expect(tm.issueCalls, 1, reason: 'SHOP_B 는 SHOP_A 발급 완료를 대기 (합류하지 않음)');
 
       tm.gates.single.complete(_tokenInfo('T-A'));
       expect(await first, 'T-A');
-      expect(await second, 'T-A', reason: 'SHOP_B 가 SHOP_A 토큰을 수신');
-      expect(tm.issuedShopCodes, ['SHOP_A']);
+
+      // SHOP_A 발급이 끝나면 SHOP_B 용 발급이 새로 시작된다
+      await _pumpUntil(() => tm.gates.length == 2);
+      tm.gates[1].complete(_tokenInfo('T-B'));
+      expect(await second, 'T-B', reason: 'SHOP_B 는 자기 shopCode 토큰을 수신');
+      expect(tm.issuedShopCodes, ['SHOP_A', 'SHOP_B']);
+      expect(tm.issueCalls, 2);
+    });
+
+    test('순차 완료 경합: SHOP_A 발급 완료 직후 시작된 SHOP_B 호출도 새로 발급받는다', () async {
+      final tm = _GatedTokenManager();
+
+      final first = tm.getValidToken('SHOP_A', password: 'pw');
+      await _pumpUntil(() => tm.gates.isNotEmpty);
+
+      // SHOP_A 완료 직후 같은 이벤트 루프 턴에서 SHOP_B 시작 (완료 전파와 경합)
+      tm.gates.single.complete(_tokenInfo('T-A'));
+      final second = tm.getValidToken('SHOP_B', password: 'pw');
+
+      expect(await first, 'T-A');
+      await _pumpUntil(() => tm.gates.length == 2);
+      tm.gates[1].complete(_tokenInfo('T-B'));
+      expect(await second, 'T-B');
+      expect(tm.issuedShopCodes, ['SHOP_A', 'SHOP_B']);
     });
 
     test('issueToken 은 password 없이 호출하면 Exception 을 던진다', () async {

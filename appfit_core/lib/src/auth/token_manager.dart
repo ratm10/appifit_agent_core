@@ -95,8 +95,11 @@ class AppFitTokenManager {
 
   TokenInfo? _cachedToken;
 
-  /// 동시 갱신 직렬화용 future — 진행 중인 발급이 있으면 후속 요청이 공유
+  /// 동시 갱신 직렬화용 future — 진행 중인 발급이 있으면 동일 shopCode 의 후속 요청이 공유
   Future<String>? _refreshingFuture;
+
+  /// 진행 중 발급의 대상 shopCode — 다른 매장 요청이 남의 발급에 합류하지 않도록 기록
+  String? _refreshingShopCode;
 
   AppFitTokenManager({
     required this.projectId,
@@ -107,7 +110,9 @@ class AppFitTokenManager {
   /// 유효한 토큰 가져오기 (자동 갱신 포함)
   /// Method 2 (로그인 방식) 사용 시 password 인자가 필요합니다.
   ///
-  /// 여러 요청이 동시에 만료된 토큰을 가지고 호출해도 내부적으로 발급은 1회만 수행됩니다.
+  /// 동일 shopCode 의 여러 요청이 동시에 만료된 토큰을 가지고 호출해도 내부적으로
+  /// 발급은 1회만 수행됩니다. 다른 shopCode 요청은 진행 중 발급에 합류하지 않고
+  /// 그 완료를 기다린 뒤 자기 shopCode 로 새로 발급받습니다.
   Future<String> getValidToken(String shopCode, {String? password}) async {
     // 1. 캐시된 토큰 확인 — shopCode 일치 + 미만료일 때만 hit.
     //    다른 매장(prefix) 토큰이 캐시에 남아있으면 폐기 후 새 발급으로 진행.
@@ -138,20 +143,39 @@ class AppFitTokenManager {
       );
     }
 
-    // 3. 진행 중인 갱신이 있으면 결과 공유 (동시 401 중복 발급 방지)
+    // 3. 진행 중인 갱신이 있으면 shopCode 일치 시에만 결과 공유 (동시 401 중복 발급 방지)
     final inFlight = _refreshingFuture;
     if (inFlight != null) {
-      await _logger.log('[Token] 기존 발급 요청에 합류');
-      return inFlight;
+      if (_refreshingShopCode == shopCode) {
+        await _logger.log('[Token] 기존 발급 요청에 합류 (shopCode=$shopCode)');
+        return inFlight;
+      }
+      // shopCode 불일치 — 남의 발급에 합류하면 다른 매장 토큰을 받게 되므로,
+      // 진행 중 발급의 완료를 기다린 뒤(결과·예외 무시) 처음부터 재평가한다.
+      await _logger.log(
+        '[Token] 진행 중 발급의 shopCode 불일치 — 완료 대기 후 재시도 '
+        '(inFlight=$_refreshingShopCode, requested=$shopCode)',
+      );
+      try {
+        await inFlight;
+      } catch (_) {
+        // 실패는 원 발급 요청자에게 전파된다. 여기서는 자기 shopCode 로
+        // 새로 발급할 것이므로 결과/예외 모두 무시한다.
+      }
+      // 캐시 재확인 + in-flight 재평가: 다른 대기자가 시작한 동일 shopCode
+      // 발급이 있으면 합류해 "동일 shopCode 발급 1회" 보장을 유지한다.
+      return getValidToken(shopCode, password: password);
     }
 
-    // 4. 새 토큰 발급 — 완료될 때까지 후속 호출이 공유할 수 있도록 저장
+    // 4. 새 토큰 발급 — 완료될 때까지 동일 shopCode 후속 호출이 공유할 수 있도록 저장
     final future = _issueAndCache(shopCode, password: password);
     _refreshingFuture = future;
+    _refreshingShopCode = shopCode;
     try {
       return await future;
     } finally {
       _refreshingFuture = null;
+      _refreshingShopCode = null;
     }
   }
 
