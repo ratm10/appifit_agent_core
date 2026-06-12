@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 
-import 'api_http_exception.dart';
-import '../auth/auth_state_provider.dart';
-import '../auth/token_manager.dart';
-import '../config/appfit_config.dart';
-import '../config/appfit_timeouts.dart';
-import '../logging/appfit_logger.dart';
+import 'package:appfit_core/src/http/api_http_exception.dart';
+import 'package:appfit_core/src/auth/auth_state_provider.dart';
+import 'package:appfit_core/src/auth/token_manager.dart';
+import 'package:appfit_core/src/config/appfit_config.dart';
+import 'package:appfit_core/src/config/appfit_timeouts.dart';
+import 'package:appfit_core/src/logging/appfit_logger.dart';
 
 /// AppFit Dio Provider
 ///

@@ -1,4 +1,4 @@
-import 'order_event_types.dart';
+import 'package:appfit_core/src/events/order_event_types.dart';
 
 /// 소켓 이벤트 페이로드 값 객체
 ///

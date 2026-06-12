@@ -1,5 +1,5 @@
-import '../events/order_event_types.dart';
-import '../events/socket_event_payload.dart';
+import 'package:appfit_core/src/events/order_event_types.dart';
+import 'package:appfit_core/src/events/socket_event_payload.dart';
 
 /// AppFit 소켓 raw 메시지를 표준화된 처리 가능 이벤트로 전처리하는 베이스 헬퍼.
 ///

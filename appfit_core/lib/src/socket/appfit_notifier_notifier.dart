@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../logging/appfit_logger.dart';
-import '../monitoring/monitoring_service.dart';
-import 'notifier_service.dart';
+import 'package:appfit_core/src/logging/appfit_logger.dart';
+import 'package:appfit_core/src/monitoring/monitoring_service.dart';
+import 'package:appfit_core/src/socket/notifier_service.dart';
 
 /// AppFit Notifier 서비스 Riverpod 래퍼 (공용)
 ///

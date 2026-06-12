@@ -6,8 +6,8 @@ import 'package:app_installer/app_installer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:dio/dio.dart';
-import '../config/appfit_timeouts.dart';
-import 'ota_models.dart';
+import 'package:appfit_core/src/config/appfit_timeouts.dart';
+import 'package:appfit_core/src/ota/ota_models.dart';
 
 /// AppFit 코어용 OTA 업데이트 관리자
 /// [OtaUpdateManager] 싱글톤 인스턴스를 통해 호출합니다.
@@ -133,7 +133,7 @@ class OtaUpdateManager {
     _pollingTimer?.cancel();
     int runningAt100Count = 0;
 
-    Future<void> _triggerInstall() async {
+    Future<void> triggerInstall() async {
       _pollingTimer?.cancel();
       _status = OtaStatusType.readyToInstall;
       debugPrint('[OtaUpdateManager] 다운로드 완료 -> readyToInstall');
@@ -154,7 +154,7 @@ class OtaUpdateManager {
           if (tasks == null || tasks.isEmpty) {
             if (_progress >= 1.0 && _status == OtaStatusType.downloading) {
               debugPrint('[OtaUpdateManager] 태스크 소멸 감지 (100% 완료로 처리)');
-              await _triggerInstall();
+              await triggerInstall();
             }
             return;
           }
@@ -172,7 +172,7 @@ class OtaUpdateManager {
               runningAt100Count++;
               if (runningAt100Count >= AppFitTimeouts.otaRunningAt100Threshold) {
                 debugPrint('[OtaUpdateManager] running 100% 지속 → complete 처리');
-                await _triggerInstall();
+                await triggerInstall();
               }
             } else {
               runningAt100Count = 0;
@@ -182,7 +182,7 @@ class OtaUpdateManager {
           }
 
           if (task.status == DownloadTaskStatus.complete) {
-            await _triggerInstall();
+            await triggerInstall();
           } else if (task.status == DownloadTaskStatus.failed ||
               task.status == DownloadTaskStatus.canceled) {
             _pollingTimer?.cancel();

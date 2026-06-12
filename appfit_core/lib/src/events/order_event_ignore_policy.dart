@@ -1,4 +1,4 @@
-import 'order_event_types.dart';
+import 'package:appfit_core/src/events/order_event_types.dart';
 
 /// 주문 이벤트를 어느 시점에 무시할지 결정하는 정책 모음.
 ///

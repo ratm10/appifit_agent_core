@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
-import '../socket/notifier_service.dart';
-import 'monitoring_context.dart';
+import 'package:appfit_core/src/socket/notifier_service.dart';
+import 'package:appfit_core/src/monitoring/monitoring_context.dart';
 
 /// Sentry 기반 모니터링 서비스 (싱글톤)
 ///

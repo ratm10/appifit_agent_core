@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../config/appfit_timeouts.dart';
-import '../logging/appfit_logger.dart';
-import 'crypto_utils.dart';
+import 'package:appfit_core/src/config/appfit_timeouts.dart';
+import 'package:appfit_core/src/logging/appfit_logger.dart';
+import 'package:appfit_core/src/auth/crypto_utils.dart';
 
 /// JWT 토큰 정보
 class TokenInfo {
@@ -204,7 +204,7 @@ class AppFitTokenManager {
         final daysUntilExpiry =
             tokenInfo.expiresAt.difference(DateTime.now()).inDays;
         await _logger.log(
-          '[Token] 로그인 성공 및 토큰 발급 완료, 만료: ${tokenInfo.expiresAt} (${daysUntilExpiry}일 후)',
+          '[Token] 로그인 성공 및 토큰 발급 완료, 만료: ${tokenInfo.expiresAt} ($daysUntilExpiry일 후)',
         );
         return tokenInfo;
       } else {

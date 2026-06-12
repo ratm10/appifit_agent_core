@@ -8,10 +8,10 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../auth/crypto_utils.dart';
-import '../config/appfit_config.dart';
-import '../config/appfit_timeouts.dart';
-import '../logging/appfit_logger.dart';
+import 'package:appfit_core/src/auth/crypto_utils.dart';
+import 'package:appfit_core/src/config/appfit_config.dart';
+import 'package:appfit_core/src/config/appfit_timeouts.dart';
+import 'package:appfit_core/src/logging/appfit_logger.dart';
 
 /// WebSocket 연결 상태
 enum ConnectionStatus {
@@ -387,7 +387,7 @@ class AppFitNotifierService {
       _maxDelaySeconds, // 최대 300초(5분)
     );
     _reconnectAttempts++;
-    _logger.log('[Notifier] $_reconnectAttempts번째 재연결 예약 (${delaySeconds}초 후)');
+    _logger.log('[Notifier] $_reconnectAttempts번째 재연결 예약 ($delaySeconds초 후)');
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {

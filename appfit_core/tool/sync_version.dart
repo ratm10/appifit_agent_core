@@ -1,7 +1,7 @@
-/// pubspec.yaml의 version을 AppFitConfig.packageVersion에 동기화하는 스크립트.
-///
-/// 사용법:
-///   cd appfit_core && dart run tool/sync_version.dart
+// pubspec.yaml의 version을 AppFitConfig.packageVersion에 동기화하는 스크립트.
+//
+// 사용법:
+//   cd appfit_core && dart run tool/sync_version.dart
 import 'dart:io';
 
 void main() {
