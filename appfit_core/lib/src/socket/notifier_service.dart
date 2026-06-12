@@ -15,11 +15,11 @@ import 'package:appfit_core/src/logging/appfit_logger.dart';
 
 /// WebSocket 연결 상태
 enum ConnectionStatus {
-  connected,          // 정상 연결됨 (초기 연결 또는 재연결 구분 없이 범용)
-  initialConnected,   // 첫 연결 성공 (앱 시작/로그인 후 최초)
-  reconnected,        // 재연결 성공 (끊김 후 복구)
-  reconnecting,       // 재연결 시도 중 (backoff 대기 포함)
-  disconnected,       // 연결 끊김 (최대 재연결 횟수 초과 또는 의도적 종료)
+  connected, // 정상 연결됨 (초기 연결 또는 재연결 구분 없이 범용)
+  initialConnected, // 첫 연결 성공 (앱 시작/로그인 후 최초)
+  reconnected, // 재연결 성공 (끊김 후 복구)
+  reconnecting, // 재연결 시도 중 (backoff 대기 포함)
+  disconnected, // 연결 끊김 (최대 재연결 횟수 초과 또는 의도적 종료)
 }
 
 /// ConnectionStatus 확장 - 연결됨 상태 편의 getter
@@ -30,6 +30,16 @@ extension ConnectionStatusExtension on ConnectionStatus {
       this == ConnectionStatus.initialConnected ||
       this == ConnectionStatus.reconnected;
 }
+
+/// WebSocket 연결 함수 시그니처.
+///
+/// 테스트에서 실제 네트워크 없이 재연결 상태머신을 검증할 수 있도록
+/// [AppFitNotifierService] 생성자에 선택적으로 주입하는 seam 입니다.
+/// 기본 구현은 [WebSocket.connect] 와 100% 동일하게 동작합니다.
+typedef AppFitWebSocketConnector = Future<WebSocket> Function(
+  String url,
+  Map<String, dynamic> headers,
+);
 
 /// AppFit 전용 WebSocket 알림 서비스
 ///
@@ -51,7 +61,7 @@ class AppFitNotifierService {
   Timer? _heartbeatTimer;
   static const Duration _heartbeatInterval = Duration(seconds: 60);
   DateTime? _lastMessageAt; // 마지막 메시지 수신 시각
-  DateTime? _connectedAt;   // 연결 수립 시각
+  DateTime? _connectedAt; // 연결 수립 시각
 
   // Race condition 방지
   bool _isConnecting = false;
@@ -83,8 +93,10 @@ class AppFitNotifierService {
   Stream<Map<String, dynamic>> get stream => _controller.stream;
 
   // 연결 상태 스트림 컨트롤러
-  final _connectionStateController = StreamController<ConnectionStatus>.broadcast();
-  Stream<ConnectionStatus> get connectionStateStream => _connectionStateController.stream;
+  final _connectionStateController =
+      StreamController<ConnectionStatus>.broadcast();
+  Stream<ConnectionStatus> get connectionStateStream =>
+      _connectionStateController.stream;
 
   // Connectivity 구독
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -92,8 +104,20 @@ class AppFitNotifierService {
   // 로거
   final AppFitLogger _logger;
 
-  AppFitNotifierService({AppFitLogger? logger})
-      : _logger = logger ?? DefaultAppFitLogger();
+  /// WebSocket 연결 함수 — 기본값은 [WebSocket.connect] 와 동일 (테스트 주입용 seam)
+  final AppFitWebSocketConnector _connector;
+
+  AppFitNotifierService({
+    AppFitLogger? logger,
+    AppFitWebSocketConnector? connector,
+  })  : _logger = logger ?? DefaultAppFitLogger(),
+        _connector = connector ?? _defaultConnector;
+
+  static Future<WebSocket> _defaultConnector(
+    String url,
+    Map<String, dynamic> headers,
+  ) =>
+      WebSocket.connect(url, headers: headers);
 
   /// 리소스 해제
   ///
@@ -188,9 +212,9 @@ class AppFitNotifierService {
           CryptoUtils.encryptAesGcm(_cachedApiKey!, _cachedAesKey!);
 
       // dart:io WebSocket을 사용하여 헤더 설정
-      final socket = await WebSocket.connect(
+      final socket = await _connector(
         wssUrl,
-        headers: {
+        {
           'Authorization': 'Bearer $encryptedApiKey',
           'X-Waldlust-ProjectId': _cachedProjectId!,
           'X-Waldlust-ShopCode': _cachedShopCode!,
@@ -209,7 +233,7 @@ class AppFitNotifierService {
       _connectedAt = DateTime.now();
       _lastMessageAt = null;
       _reconnectAttempts = 0;
-      _reconnectTimer?.cancel();  // 연결 성공 시 예약된 재연결 타이머 취소
+      _reconnectTimer?.cancel(); // 연결 성공 시 예약된 재연결 타이머 취소
       _reconnectTimer = null;
 
       // 초기 연결 vs 재연결 구분 emit
@@ -247,7 +271,8 @@ class AppFitNotifierService {
   /// Heartbeat 시작 (Ghost Connection 감지)
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _logger.log('[Notifier] Heartbeat 시작 (간격: ${_heartbeatInterval.inSeconds}초)');
+    _logger
+        .log('[Notifier] Heartbeat 시작 (간격: ${_heartbeatInterval.inSeconds}초)');
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) async {
       final readyState = _socket?.readyState;
       final readyStateName = _readyStateName(readyState);
@@ -426,7 +451,7 @@ class AppFitNotifierService {
   void notifyNetworkRestored() {
     if (_isDisposed) return;
     if (_cachedShopCode == null) return;
-    if (_isConnected || _isConnecting) return;  // 연결 시도 중에도 무시
+    if (_isConnected || _isConnecting) return; // 연결 시도 중에도 무시
     _logger.log('[Notifier] 네트워크 복원 → backoff 초기화 후 즉시 재연결');
     _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
@@ -469,9 +494,8 @@ class AppFitNotifierService {
   /// 소켓 메시지를 읽기 좋은 멀티라인 map 형식으로 포맷
   String _formatSocketMessage(dynamic decoded) {
     if (decoded is! Map<String, dynamic>) return decoded.toString();
-    final eventType = decoded['eventType'] as String?
-        ?? decoded['@type'] as String?
-        ?? '?';
+    final eventType =
+        decoded['eventType'] as String? ?? decoded['@type'] as String? ?? '?';
     final payload = decoded['payload'] as Map<String, dynamic>?;
     if (payload == null) return eventType;
 
