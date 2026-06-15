@@ -238,17 +238,18 @@ class AppFitTokenManager {
       await _logger.error('[Token] 로그인 요청 오류: ${e.message}', null);
       if (e.response != null) {
         await _logger.error('- Error Response: ${e.response?.data}', null);
-
-        // 서버 에러 응답의 message 필드 추출
-        if (e.response?.data is Map) {
-          final data = e.response?.data as Map;
-          final serverMessage = data['message'];
-          if (serverMessage != null && serverMessage.toString().isNotEmpty) {
-            throw Exception('로그인 API 오류: $serverMessage');
-          }
-        }
       }
-      throw Exception('로그인 API 오류: ${e.message}');
+      // 원본 DioException 을 보존해 그대로 전파한다.
+      //
+      // 과거에는 Exception('로그인 API 오류: ...') 평문으로 collapse 해 소비자가
+      // HTTP status / 응답 본문(code·message) / DioExceptionType 에 접근하지
+      // 못하고 e.toString() 문자열 매칭에 의존해야 했다(네트워크/타임아웃 구분
+      // 불가, 서버 message 가 영문 e.message 로 대체되는 등 정보 손실). 메인 Dio
+      // 인터셉터(dio_provider)는 이미 원본 DioException 을 전파하는 계약이므로,
+      // 인터셉터 없는 sign-in 전용 Dio 도 동일하게 원본을 전파해 소비자(앱)가
+      // e.response.data 의 서버 message / status / type 으로 구조화된 에러
+      // 처리를 할 수 있게 한다.
+      rethrow;
     } catch (e) {
       await _logger.error('[Token] 로그인 실패: $e', null);
       rethrow;

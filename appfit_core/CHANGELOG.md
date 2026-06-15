@@ -3,7 +3,26 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.12 (현재) — 토큰 발급 매장 격리 보강 + 테스트 안전망
+## v1.0.13 (현재) — 로그인 에러 원본 DioException 보존
+
+### Changed
+- `AppFitTokenManager.issueToken()`: 로그인(sign-in) 요청 실패 시 원본
+  `DioException` 을 그대로 전파하도록 변경. 과거에는
+  `Exception('로그인 API 오류: <msg>')` 평문으로 collapse 해 소비자가 HTTP
+  status / 응답 본문(`code`·`message`) / `DioExceptionType` 에 접근하지 못하고
+  `e.toString()` 문자열 매칭에 의존해야 했다(네트워크·타임아웃 구분 불가, 서버
+  `message` 가 영문 `e.message` 로 대체되는 정보 손실). 메인 Dio 인터셉터와
+  동일한 "원본 DioException 전파" 계약으로 통일.
+
+  **소비자 영향 (behavior change, 시그니처는 non-breaking)**: `getValidToken()` /
+  `issueToken()` 실패 시 던져지는 예외 타입이 평문 `Exception` →
+  `DioException` 으로 바뀐다. `e is DioException` 분기로
+  `e.response?.data['message']` / `e.response?.statusCode` / `e.type` 에 직접
+  접근 가능. 기존에 예외를 로깅만 하거나 rethrow 하던 소비자(did)는 영향
+  없음(`toString()` 은 dio 표준 포맷). appfit_order_agent 는
+  `mapDioErrorToApiException` 가 이미 DioException 을 처리.
+
+## v1.0.12 — 토큰 발급 매장 격리 보강 + 테스트 안전망
 
 ### Fixed
 - `AppFitTokenManager.getValidToken()`: 진행 중(in-flight) 토큰 발급에 다른
