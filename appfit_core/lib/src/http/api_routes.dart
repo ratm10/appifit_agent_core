@@ -36,7 +36,8 @@ class ApiRoutes {
   // Coupon
   static String couponValidate(String couponNo) =>
       '$version/coupon/$couponNo/validate';
-  static String couponUse(String couponNo) => '$version/coupon/$couponNo/use';
+  static String couponUse(String couponNo) =>
+      '$version/coupon/$couponNo/use-without-item';
   static String couponUseCancel(String couponNo) =>
       '$version/coupon/$couponNo/use-cancel';
   static const String couponHistory = '$version/coupons/history';

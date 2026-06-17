@@ -3,7 +3,22 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.13 (현재) — 로그인 에러 원본 DioException 보존
+## v1.0.14 (현재) — 쿠폰 사용 엔드포인트 use-without-item 전환
+
+### Changed
+- `ApiRoutes.couponUse(couponNo)`: 반환 경로를 `/v0/coupon/{couponNo}/use` →
+  `/v0/coupon/{couponNo}/use-without-item` 로 변경. 신규 엔드포인트는 주문
+  아이템 목록 없이 쿠폰을 즉시 사용하므로, 소비자는 요청 바디에서 `items` 필드를
+  생략할 수 있다. 메서드 시그니처는 그대로 `String couponUse(String couponNo)`
+  (**non-breaking signature, behavior change**).
+
+  **소비자 영향**: `couponUse` 를 호출하는 소비자는 신규 경로/계약으로 자동
+  전환된다. did 는 본 라우트를 사용하지 않아 영향 없음. appfit_order_agent 는
+  `ApiService.useCoupon` 이 본 라우트를 사용하며 `items` 필드를 제거하도록 동시
+  반영. 사전 검증용 `ApiRoutes.couponValidate` 는 그대로 유지(미제거)하나,
+  use-without-item 흐름에서는 호출하지 않아도 된다.
+
+## v1.0.13 — 로그인 에러 원본 DioException 보존
 
 ### Changed
 - `AppFitTokenManager.issueToken()`: 로그인(sign-in) 요청 실패 시 원본
