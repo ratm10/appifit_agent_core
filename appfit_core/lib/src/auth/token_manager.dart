@@ -122,7 +122,7 @@ class AppFitTokenManager {
         return _cachedToken!.token;
       }
       await _logger.log(
-        '[Token] shopCode mismatch — 메모리 캐시 폐기 '
+        '[Token] shopCode mismatch - 메모리 캐시 폐기 '
         '(cached=${_cachedToken!.shopCode}, requested=$shopCode)',
       );
       _cachedToken = null;
@@ -138,7 +138,7 @@ class AppFitTokenManager {
         return savedToken.token;
       }
       await _logger.log(
-        '[Token] shopCode mismatch — 저장된 토큰 폐기 '
+        '[Token] shopCode mismatch - 저장된 토큰 폐기 '
         '(stored=${savedToken.shopCode ?? "(legacy)"}, requested=$shopCode)',
       );
     }

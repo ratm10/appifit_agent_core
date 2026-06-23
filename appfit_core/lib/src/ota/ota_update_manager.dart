@@ -171,7 +171,7 @@ class OtaUpdateManager {
             if (progress >= 1.0) {
               runningAt100Count++;
               if (runningAt100Count >= AppFitTimeouts.otaRunningAt100Threshold) {
-                debugPrint('[OtaUpdateManager] running 100% 지속 → complete 처리');
+                debugPrint('[OtaUpdateManager] running 100% 지속 -> complete 처리');
                 await triggerInstall();
               }
             } else {

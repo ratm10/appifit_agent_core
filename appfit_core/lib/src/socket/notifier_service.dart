@@ -295,7 +295,7 @@ class AppFitNotifierService {
       if (readyState == null || readyState != WebSocket.open) {
         // 비정상 — 프로덕션에서도 반드시 로깅 (재연결 진입 사유)
         await _logger.log(
-          '[Notifier] Heartbeat: 연결 끊김 감지 → 재연결 '
+          '[Notifier] Heartbeat: 연결 끊김 감지 -> 재연결 '
           '(readyState: $readyStateName, 연결유지: $connectedDurationStr, 마지막수신: $sinceLastMessageStr)',
         );
         _handleDisconnection();
@@ -452,7 +452,7 @@ class AppFitNotifierService {
     if (_isDisposed) return;
     if (_cachedShopCode == null) return;
     if (_isConnected || _isConnecting) return; // 연결 시도 중에도 무시
-    _logger.log('[Notifier] 네트워크 복원 → backoff 초기화 후 즉시 재연결');
+    _logger.log('[Notifier] 네트워크 복원 -> backoff 초기화 후 즉시 재연결');
     _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -491,7 +491,10 @@ class AppFitNotifierService {
     _hasEverConnected = false;
   }
 
-  /// 소켓 메시지를 읽기 좋은 멀티라인 map 형식으로 포맷
+  /// 소켓 메시지를 한 줄 key=value 형식으로 요약.
+  ///
+  /// 운영 로그 가독성을 위해 핵심 필드만 단일 라인으로 출력한다.
+  /// 메뉴는 `메뉴명 x수량(+옵션수)` 로 요약하며, 옵션 상세는 생략한다.
   String _formatSocketMessage(dynamic decoded) {
     if (decoded is! Map<String, dynamic>) return decoded.toString();
     final eventType =
@@ -499,69 +502,38 @@ class AppFitNotifierService {
     final payload = decoded['payload'] as Map<String, dynamic>?;
     if (payload == null) return eventType;
 
-    final buf = StringBuffer('\n');
-    void row(String key, dynamic value) =>
-        buf.writeln('  ${key.padRight(11)}: $value');
+    final parts = <String>['type=$eventType'];
+    void add(String key, dynamic value) {
+      if (value != null) parts.add('$key=$value');
+    }
 
-    row('type', eventType);
-
-    final shopName = payload['shopName'];
-    if (shopName != null) row('shop', shopName);
-
-    final userId = payload['userId'];
-    if (userId != null) row('userId', userId);
-
-    final orderSource = payload['orderSource'];
-    if (orderSource != null) row('source', orderSource);
-
-    final orderNo = payload['orderNo'];
-    if (orderNo != null) row('orderNo', orderNo);
-
+    add('source', payload['orderSource']);
+    add('orderNo', payload['orderNo']);
     final displayNo = payload['displayOrderNo'];
-    final shopNo = payload['shopOrderNo'];
-    if (displayNo != null) row('displayNo', '#$displayNo');
-    if (shopNo != null) row('shopNo', shopNo);
-
-    final orderName = payload['orderName'];
-    if (orderName != null) row('orderName', orderName);
-
-    final totalAmount = payload['totalAmount'];
-    if (totalAmount != null) row('amount', '$totalAmount');
-
+    if (displayNo != null) parts.add('displayNo=#$displayNo');
+    add('shopNo', payload['shopOrderNo']);
+    add('orderName', payload['orderName']);
+    add('amount', payload['totalAmount']);
     final readyTime = payload['readyTime'];
-    if (readyTime != null) row('readyTime', '${readyTime}min');
-
-    final orderAction = payload['orderAction'];
-    if (orderAction != null) row('orderAction', orderAction);
-
-    final message = payload['message'];
-    if (message != null) row('message', message);
-
-    final createdAt = payload['createdAt'];
-    if (createdAt != null) row('createdAt', createdAt);
+    if (readyTime != null) parts.add('readyTime=${readyTime}min');
+    add('action', payload['orderAction']);
+    add('message', payload['message']);
 
     final orderLines = payload['orderLines'];
     if (orderLines is List && orderLines.isNotEmpty) {
-      buf.writeln('  lines       :');
-      for (var i = 0; i < orderLines.length; i++) {
-        final line = orderLines[i];
-        if (line is! Map<String, dynamic>) continue;
-        final posId = line['posId'] as String? ?? '?';
+      final items = <String>[];
+      for (final line in orderLines.whereType<Map<String, dynamic>>()) {
         final itemName = line['itemName'] as String? ?? '?';
         final qty = line['qty'];
-        buf.writeln('    [${i + 1}][$posId] $itemName x$qty');
         final options = line['options'];
-        if (options is List && options.isNotEmpty) {
-          for (final opt in options.whereType<Map<String, dynamic>>()) {
-            final optPosId = opt['posId'] as String? ?? '?';
-            final optName = opt['optionName'] as String? ?? '?';
-            final optQty = opt['qty'] ?? 1;
-            buf.writeln('         [$optPosId] $optName x$optQty');
-          }
-        }
+        final optCount =
+            (options is List) ? options.whereType<Map>().length : 0;
+        items.add(
+            optCount > 0 ? '$itemName x$qty(+$optCount)' : '$itemName x$qty');
       }
+      parts.add('items=[${items.join(', ')}]');
     }
 
-    return buf.toString().trimRight();
+    return parts.join(' ');
   }
 }

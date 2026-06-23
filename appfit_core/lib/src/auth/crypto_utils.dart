@@ -135,7 +135,7 @@ class CryptoUtils {
 
     if (kDebugMode) {
       debugPrint(
-        '[CryptoUtils] ⚠️ AES 키 길이 불일치: '
+        '[CryptoUtils] [WARN] AES 키 길이 불일치: '
         '${keyBytes.length} bytes (expected: $aesKeyBytes). '
         '자동 보정(패딩/자르기)으로 동작하지만 암호화 강도가 저하될 수 있습니다.',
       );
