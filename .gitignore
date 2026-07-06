@@ -14,3 +14,10 @@ build/
 
 # Claude
 .claude/
+
+# 환경 변수/시크릿
+.env
+.env.*
+
+# Outline C4 게시 임시 스크린샷
+corec4model/_shots/
