@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — AppFitNotifierService</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#22d3ee;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#3b82f6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.swap{position:fixed;top:60px;right:18px;z-index:30;font-size:12px;color:#c4b5fd;text-decoration:none;padding:5px 12px;border:1px solid rgba(139,92,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.swap:hover{background:rgba(139,92,246,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — AppFitNotifierService</h1>
+  <div class="sub mono">lib/src/socket/notifier_service.dart</div>
+</div>
+<a class="back" href="c4core-l3-socket-events.html">&larr; L3 Components</a>
+<a class="swap" href="c4core-l4-socket-dispatcher.html">SocketEventDispatcher &rarr;</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-socket-events.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">WebSocket 연결의 <b>완결형 상태 머신</b>. 연결·재연결·하트비트·네트워크 복원을 내부에서 전부 처리하고, 소비자에게는 <b>메시지 스트림</b>과 <b>연결상태 스트림</b> 두 개만 노출한다. 지수 backoff(3&rarr;300s·최대 5회) 소진 후엔 <code>connectivity_plus</code> 복원 이벤트를 기다린다.</div>
+
+  <div class="sec"><span class="sd" style="background:#22d3ee;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">생성자 주입: logger? · connector?(테스트 seam)</div>
+      <div class="class-name">AppFitNotifierService</div>
+      <div class="class-layer">IOWebSocketChannel · broadcast 스트림 2종</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#67e8f9;"></span>의존</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">WebSocket.connect</span><span class="dep-ds">dart:io · connector seam으로 주입 가능</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">CryptoUtils.encryptAesGcm</span><span class="dep-ds">apiKey 암호화 → Bearer 헤더</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">Connectivity()</span><span class="dep-ds">wifi/mobile/ethernet 복원 감지</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">AppFitConfig.websocketUrl</span><span class="dep-ds">환경별 wss:// + /ws</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#67e8f9;"></span>주요 메서드</div>
+    <div class="methods">
+
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">connect()</span><span class="m-sig">({shopCode, projectId, apiKey, aesKey})</span><span class="m-tag">진입</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">가드</div><div class="md-v">dispose 후 무시 · 동일 shopCode로 이미 연결이면 무시. 4개 인자 캐싱(재연결용) + connectivity 리스너 등록 후 <code>_connectInternal</code></div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-p">P</div>
+        <div class="m-head"><span class="m-name">_connectInternal()</span><span class="m-sig">race 방지</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">_isConnecting 가드</span><span class="md-arr">→</span>
+            <span class="md-step">기존 정리</span><span class="md-arr">→</span>
+            <span class="md-step hot">encryptAesGcm(apiKey) 헤더</span><span class="md-arr">→</span>
+            <span class="md-step">connect().timeout(20s)</span><span class="md-arr">→</span>
+            <span class="md-step">pingInterval 25s</span><span class="md-arr">→</span>
+            <span class="md-step">listen(msg/err/done)</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">emit</div><div class="md-v">최초 연결이면 <code>initialConnected</code>, 이후면 <code>reconnected</code>. 성공 시 backoff·타이머 리셋 + <code>_startHeartbeat</code></div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-p">P</div>
+        <div class="m-head"><span class="m-name">_startHeartbeat()</span><span class="m-sig">60s periodic</span><span class="m-tag">Ghost 감지</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">판정</div><div class="md-v"><code>readyState != open</code>이면 끊김 감지 &rarr; <code>_handleDisconnection</code>. open이면 정상(디버그만 로그). 마지막 메시지 후 <b>5분</b> 무수신은 Ghost 의심 신호</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-p">P</div>
+        <div class="m-head"><span class="m-name">_handleDisconnection() → _scheduleReconnect()</span><span class="m-sig">backoff</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">중복 가드</div><div class="md-v"><code>_isHandlingDisconnection</code> — heartbeat/onError/onDone 동시 호출에도 1회만. cleanup은 fire-and-forget(void 콜백)</div></div>
+          <div class="md-row"><div class="md-l">지연</div><div class="md-v"><code>min(3 × 2^attempt, 300)</code>초 = 3→6→12→24→...→300. <code>reconnecting</code> emit 후 타이머 예약</div></div>
+          <div class="md-row"><div class="md-l">소진</div><div class="md-v">5회 초과 시 <code>disconnected</code> emit 후 <b>네트워크 복원 대기</b> — 더 이상 능동 재시도 없음</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">notifyNetworkRestored()</span><span class="m-sig">복원 즉시 재연결</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v">connectivity 리스너(또는 외부 호출)가 트리거 — 연결/시도 중이 아니면 <b>backoff 초기화</b> 후 즉시 <code>_scheduleReconnect</code>. intentional disconnect(<code>_cachedShopCode==null</code>) 후엔 무시</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">disconnect() · dispose()</span><span class="m-sig">종료</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">disconnect</div><div class="md-v">로그아웃용 — 타이머·connectivity·연결 정리 + <code>disconnected</code> emit + 캐시 4종 null(재연결 불가화)</div></div>
+          <div class="md-row"><div class="md-l">dispose</div><div class="md-v"><code>_isDisposed=true</code> 후 리스너 취소 &rarr; StreamController close 순서로 "close 직후 add" 레이스 방지</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#a78bfa;"></span>연결 상태 · 상수</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#c4b5fd;background:rgba(139,92,246,.1);">enum</div>
+      <div class="entity-name">ConnectionStatus</div>
+      <div class="entity-tag">isConnected 확장 getter</div>
+    </div>
+    <div class="fields">
+      <div class="field"><span class="f-col">connected / initialConnected / reconnected</span><span class="f-type">isConnected=true</span><span class="f-desc">연결됨 3종</span></div>
+      <div class="field"><span class="f-col">reconnecting</span><span class="f-type">backoff 대기</span><span class="f-desc">재시도 중</span></div>
+      <div class="field"><span class="f-col">disconnected</span><span class="f-type">종료/소진</span><span class="f-desc">최대 초과 또는 의도적 종료</span></div>
+    </div>
+    <div class="fgt">상수 (AppFitTimeouts / 내부)</div>
+    <div class="fields">
+      <div class="field"><span class="f-col">backoff</span><span class="f-type">3s → 300s · ×2</span><span class="f-desc">최대 5회 시도</span></div>
+      <div class="field"><span class="f-col">heartbeat</span><span class="f-type">60s</span><span class="f-desc">wsPing 25s 별도</span></div>
+      <div class="field"><span class="f-col">ghost 임계</span><span class="f-type">5분</span><span class="f-desc">무수신 경고</span></div>
+      <div class="field"><span class="f-col">connect timeout</span><span class="f-type">20s</span><span class="f-desc">초기 연결</span></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#34d399;"></span>노출 스트림</div>
+  <div class="ifc-card">
+    <div class="ifc-list">
+      <div class="ifc"><span class="ifc-m im-sock">STREAM</span><span class="ifc-p">stream : Stream&lt;Map&lt;String,dynamic&gt;&gt;</span><span class="ifc-d">파싱된 주문/기기명령 이벤트 (broadcast)</span></div>
+      <div class="ifc"><span class="ifc-m im-sock">STREAM</span><span class="ifc-p">connectionStateStream : Stream&lt;ConnectionStatus&gt;</span><span class="ifc-d">MonitoringService·폴링 적응이 구독</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

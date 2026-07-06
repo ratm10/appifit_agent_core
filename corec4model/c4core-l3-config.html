@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L3 — Config Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#3b82f6;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#f59e0b;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.l3main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:78px 28px 90px;}
+.l3lead{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:8px;}
+.l3lead b{color:var(--muted);}
+.l3lead code{color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;font-size:11.5px;}
+.l3note{font-size:11.5px;color:#475569;margin-bottom:22px;}
+.l3note b{color:#93c5fd;}
+.layer{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:stretch;margin-bottom:14px;}
+.layer-label{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:12px 13px;border-radius:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);}
+.layer-label .ln{font-size:13px;font-weight:800;color:#e2e8f0;}
+.layer-label .lt{font-size:9.5px;font-weight:600;color:#64748b;}
+.layer-label .ld{width:9px;height:9px;border-radius:3px;margin-bottom:2px;}
+.comps{display:flex;gap:10px;flex-wrap:wrap;align-content:center;padding:5px 0;}
+.comp{flex:1;min-width:210px;background:rgba(10,18,35,.72);border:1.5px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 14px;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;}
+.comp .cn{font-size:13.5px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.comp .cr{font-size:10.5px;color:#94a3b8;margin-top:3px;line-height:1.45;}
+.comp .cf{font-size:9.5px;color:#475569;margin-top:5px;font-family:'JetBrains Mono',monospace;}
+.t-orch{border-color:rgba(59,130,246,.35);} .t-orch .cn{color:#93c5fd;}
+.t-svc{border-color:rgba(245,158,11,.3);} .t-svc .cn{color:#fbbf24;}
+.consts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.kv{font-size:10px;font-family:'JetBrains Mono',monospace;color:#cbd5e1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:2px 8px;}
+.kv b{color:#67e8f9;font-weight:700;}
+@keyframes c4-cin{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.layer{opacity:0;animation:c4-cin .5s ease both;}
+.layer:nth-child(4){animation-delay:.06s;}.layer:nth-child(5){animation-delay:.12s;}
+@media(prefers-reduced-motion:reduce){.layer{animation:none;opacity:1;}}
+@media(max-width:760px){.l3main{padding:70px 12px 80px;}.layer{grid-template-columns:1fr;}.comp{min-width:100%;}}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 3 — Config Components</h1>
+  <div class="sub mono">lib/src/config/</div>
+</div>
+<a class="back" href="c4core-l2.html">&larr; L2 Container</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <span class="on" title="L3 Component">L3</span>
+  <span class="off" title="L4 없음">L4</span>
+</div>
+
+<div class="l3main">
+  <div class="l3lead"><b>모든 환경 의존 값의 단일 정본.</b> 소비자 앱이 <code>AppFitConfig.configure()</code>를 <b>부팅 시 1회</b> 호출해 환경을 선결정하면, 이후 HTTP·소켓 모듈이 <code>baseUrl</code>/<code>websocketUrl</code>을 정적으로 조회한다.</div>
+  <div class="l3note"><b>주의</b> — <code>packageVersion</code>은 <code>pubspec.yaml</code>의 <code>version</code>과 <code>tool/sync_version.dart</code>로 동기화(수동 편집 금지). 환경 전환은 재시작이 아니라 <code>configure()</code> 재호출로 반영되지만, 이미 생성된 Dio 인스턴스의 baseUrl은 갱신되지 않으므로 재생성이 필요.</div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#3b82f6;"></div><div class="ln">환경 결정</div><div class="lt">URL · 메타</div></div>
+    <div class="comps">
+      <div class="comp t-orch"><div class="cn">AppFitConfig</div><div class="cr">정적 홀더 — 환경·projectId·requestSource 보관. <code>baseUrl</code>/<code>websocketUrl</code>/<code>getConfigSummary()</code>(민감정보 마스킹) 제공.</div>
+        <div class="consts"><span class="kv"><b>packageVersion</b> 1.0.14</span><span class="kv">requestSource DID/KIOSK/ORDER_AGENT</span></div>
+        <div class="cf">appfit_config.dart</div></div>
+      <div class="comp t-orch"><div class="cn">AppFitEnvironment</div><div class="cr">enum — 환경별 base/WebSocket URL 바인딩.</div>
+        <div class="consts"><span class="kv">dev</span><span class="kv">staging</span><span class="kv"><b>live</b></span><span class="kv">japanLive</span></div>
+        <div class="cf">core-api · core-jpapi.waldplatform.com</div></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#f59e0b;"></div><div class="ln">시간 상수</div><div class="lt">타임아웃 · 폴링</div></div>
+    <div class="comps">
+      <div class="comp t-svc"><div class="cn">AppFitTimeouts</div><div class="cr">HTTP·WebSocket·OTA 매직넘버 단일화.</div>
+        <div class="consts"><span class="kv">connect/receive <b>30s</b></span><span class="kv">wsConnect <b>20s</b></span><span class="kv">wsPing <b>25s</b></span><span class="kv">ghost <b>5m</b></span><span class="kv">otaPoll 500ms</span></div>
+        <div class="cf">appfit_timeouts.dart</div></div>
+      <div class="comp t-svc"><div class="cn">AppFitSyncIntervals</div><div class="cr">소켓 상태별 적응형 폴링 간격 (agent·did 공통).</div>
+        <div class="consts"><span class="kv">connected <b>60s</b> 안전망</span><span class="kv">disconnected <b>15s</b> 보완</span></div>
+        <div class="cf">sync_intervals.dart</div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

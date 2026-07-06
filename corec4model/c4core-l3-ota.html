@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L3 — OTA Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#22d3ee;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#f59e0b;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.l3main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:78px 28px 90px;}
+.l3lead{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:8px;}
+.l3lead b{color:var(--muted);}
+.l3lead code{color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;font-size:11.5px;}
+.l3note{font-size:11.5px;color:#475569;margin-bottom:22px;}
+.l3note b{color:#93c5fd;}
+.layer{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:stretch;margin-bottom:14px;}
+.layer-label{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:12px 13px;border-radius:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);}
+.layer-label .ln{font-size:13px;font-weight:800;color:#e2e8f0;}
+.layer-label .lt{font-size:9.5px;font-weight:600;color:#64748b;}
+.layer-label .ld{width:9px;height:9px;border-radius:3px;margin-bottom:2px;}
+.comps{display:flex;gap:10px;flex-wrap:wrap;align-content:center;padding:5px 0;}
+.comp{flex:1;min-width:210px;background:rgba(10,18,35,.72);border:1.5px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 14px;transition:border-color .2s;}
+.comp .cn{font-size:13.5px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.comp .cr{font-size:10.5px;color:#94a3b8;margin-top:3px;line-height:1.45;}
+.comp .cf{font-size:9.5px;color:#475569;margin-top:5px;font-family:'JetBrains Mono',monospace;}
+.t-orch{border-color:rgba(59,130,246,.35);} .t-orch .cn{color:#93c5fd;}
+.t-pp{border-color:rgba(34,211,238,.3);} .t-pp .cn{color:#67e8f9;}
+.consts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.kv{font-size:10px;font-family:'JetBrains Mono',monospace;color:#cbd5e1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:2px 8px;}
+.kv b{color:#67e8f9;font-weight:700;}
+.pipe{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;}
+.pstep{font-size:10.5px;font-family:'JetBrains Mono',monospace;color:#cbd5e1;background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.22);border-radius:7px;padding:3px 9px;}
+.parr{color:#334155;font-size:11px;}
+@keyframes c4-cin{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.layer{opacity:0;animation:c4-cin .5s ease both;}
+.layer:nth-child(3){animation-delay:.06s;}.layer:nth-child(4){animation-delay:.12s;}
+@media(prefers-reduced-motion:reduce){.layer{animation:none;opacity:1;}}
+@media(max-width:760px){.l3main{padding:70px 12px 80px;}.layer{grid-template-columns:1fr;}.comp{min-width:100%;}}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 3 — OTA Components</h1>
+  <div class="sub mono">lib/src/ota/</div>
+</div>
+<a class="back" href="c4core-l2.html">&larr; L2 Container</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <span class="on" title="L3 Component">L3</span>
+  <span class="off" title="L4 없음">L4</span>
+</div>
+
+<div class="l3main">
+  <div class="l3lead"><b>Android APK 자가 업데이트</b>의 다운로드·설치 기계. 버전 JSON 비교로 신규 유무를 판정하고, flutter_downloader 큐를 0.5s로 폴링하며 완료 시 <code>app_installer</code>로 설치를 띄운다. <b>버전 JSON·다운로드 URL은 소비자 앱이 주입</b>(채널 분기는 앱 몫).</div>
+  <div class="l3note"><b>플랫폼</b> — 저장 경로는 Android <code>ApplicationSupportDirectory</code> / 기타 <code>TemporaryDirectory</code>. 일부 기기가 complete를 미보고해도 <b>running 100%가 4회 연속</b>이거나 태스크 소멸 시 완료로 간주(강건성). Windows OTA(ZIP·updater.bat)는 이 패키지가 아니라 소비자 앱 측 구현.</div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#3b82f6;"></div><div class="ln">관리자</div><div class="lt">싱글톤</div></div>
+    <div class="comps">
+      <div class="comp t-orch"><div class="cn">OtaUpdateManager</div><div class="cr">싱글톤. <code>checkForUpdate</code>(buildNumber vs 서버 version) &middot; <code>executeUpdate</code>(enqueue+폴링) &middot; <code>install</code> &middot; <code>cancelUpdate</code>. 상태·진행률 콜백으로 UI 보고.</div>
+        <div class="pipe"><span class="pstep">checkForUpdate</span><span class="parr">&rarr;</span><span class="pstep">enqueue</span><span class="parr">&rarr;</span><span class="pstep">poll 500ms</span><span class="parr">&rarr;</span><span class="pstep">install APK</span></div>
+        <div class="cf">ota_update_manager.dart</div></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#22d3ee;"></div><div class="ln">모델</div><div class="lt">상태 · 정보</div></div>
+    <div class="comps">
+      <div class="comp t-pp"><div class="cn">OtaStatusType</div><div class="cr">상태 enum — idle·downloading·readyToInstall·installing·error 등 진행 단계.</div><div class="cf">ota_models.dart</div></div>
+      <div class="comp t-pp"><div class="cn">UpdateInfo</div><div class="cr">버전 체크 결과 — currentVersion·latestVersion·downloadUrl·<code>hasUpdate</code>(server &gt; current).</div><div class="cf">ota_models.dart</div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

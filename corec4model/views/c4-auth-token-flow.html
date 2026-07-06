@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 — 인증 토큰 흐름 (appfit_core)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4.css">
+<style>
+:root{--accent:#93c5fd;--accent-bg:rgba(59,130,246,.15);--accent-br:rgba(59,130,246,.35);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#06080d;color:#e2e8f0;min-height:100vh;overflow-y:auto;}
+code,.mono{font-family:'JetBrains Mono','Fira Code',monospace;}
+.ambient{position:fixed;border-radius:50%;filter:blur(120px);opacity:.07;pointer-events:none;z-index:0;}
+.amb1{width:600px;height:600px;background:#3b82f6;top:4%;left:18%;}
+.amb2{width:480px;height:480px;background:#8b5cf6;top:45%;right:10%;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.03) 1px, transparent 0);background-size:48px 48px;z-index:0;pointer-events:none;}
+.main{position:relative;z-index:1;max-width:920px;margin:0 auto;padding:30px 28px 90px;}
+.intro{font-size:13px;color:#64748b;margin-bottom:26px;line-height:1.6;}
+.intro b{color:#94a3b8;}
+.intro code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+.boot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:26px;padding:12px 16px;border:1px dashed rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.015);}
+.boot .bl{font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-right:4px;}
+.boot .bstep{font-size:12px;color:#94a3b8;padding:4px 10px;border-radius:7px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);}
+.boot .barr{color:#334155;}
+.journey{position:relative;}
+.stage{display:grid;grid-template-columns:56px 1fr;gap:18px;position:relative;}
+.stage:not(:last-child){padding-bottom:16px;}
+.stage:not(:last-child)::after{content:'';position:absolute;left:27px;top:54px;bottom:-2px;width:2px;background:linear-gradient(180deg,var(--c,#3b82f6),rgba(255,255,255,.04));opacity:.5;}
+.st-node{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#06080d;background:var(--c,#3b82f6);box-shadow:0 0 24px -4px var(--c,#3b82f6);position:relative;z-index:2;}
+.st-card{background:rgba(10,18,35,.78);border:1.5px solid rgba(255,255,255,.08);border-radius:16px;padding:16px 18px;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s;}
+.st-card.link{cursor:pointer;}
+.st-card.link:hover{transform:translateY(-2px);border-color:var(--c,#3b82f6);box-shadow:0 10px 28px rgba(0,0,0,.4);}
+.st-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.st-title{font-size:16px;font-weight:800;color:#f1f5f9;}
+.st-actor{font-size:11px;font-weight:600;color:var(--c,#60a5fa);background:color-mix(in srgb,var(--c,#3b82f6) 12%,transparent);padding:2px 9px;border-radius:6px;}
+.st-desc{font-size:12.5px;color:#94a3b8;line-height:1.55;margin-bottom:9px;}
+.st-desc code{font-size:11px;color:#fbbf24;background:rgba(245,158,11,.08);padding:0 4px;border-radius:3px;}
+.chips{display:flex;gap:7px;flex-wrap:wrap;}
+.chip{font-size:11px;color:#cbd5e1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:3px 9px;font-family:'JetBrains Mono',monospace;}
+.chip .k{color:#64748b;font-family:'Inter',sans-serif;}
+.chip.mgr{border-color:rgba(96,165,250,.3);color:#93c5fd;}
+.chip.warn{border-color:rgba(248,113,113,.3);color:#fca5a5;}
+.drill{display:inline-flex;align-items:center;gap:5px;margin-top:10px;font-size:11px;font-weight:700;color:var(--c,#60a5fa);}
+.gw{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+.gw-item{border:1px solid rgba(139,92,246,.3);border-radius:9px;padding:8px 10px;background:rgba(139,92,246,.04);}
+.gw-item .gn{font-size:11px;font-weight:800;color:#c4b5fd;font-family:'JetBrains Mono',monospace;}
+.gw-item .gc{font-size:10px;color:#64748b;margin-top:2px;line-height:1.4;}
+.note{margin-top:24px;padding:14px 18px;background:rgba(59,130,246,.05);border:1px dashed rgba(59,130,246,.25);border-radius:12px;font-size:12.5px;color:#cbd5e1;line-height:1.65;}
+.note b{color:#93c5fd;}
+.note code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.stage{opacity:0;animation:cardIn .5s ease both;}
+.stage:nth-child(2){animation-delay:.05s;}.stage:nth-child(3){animation-delay:.1s;}.stage:nth-child(4){animation-delay:.15s;}
+.stage:nth-child(5){animation-delay:.2s;}.stage:nth-child(6){animation-delay:.25s;}
+@media(prefers-reduced-motion:reduce){.stage{animation:none;opacity:1;}}
+@media(max-width:680px){.main{padding:20px 12px 70px;}.stage{grid-template-columns:42px 1fr;gap:12px;}.stage:not(:last-child)::after{left:20px;top:44px;}.st-node{width:42px;height:42px;font-size:15px;border-radius:12px;}.gw{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<header id="c4-hdr"></header>
+
+<div class="main">
+  <div class="intro">소비자 앱이 REST를 호출하면 Dio 인터셉터가 <b>유효 토큰을 확보</b>해 Bearer 헤더를 붙인다. 토큰은 <b>메모리 &rarr; SecureStorage &rarr; 신규 발급</b> 3단계로 얻으며, 401이 몰려도 동일 매장 발급은 <b>정확히 1회</b>로 직렬화된다. 상세 구조는 <b>TokenManager L4</b>.</div>
+
+  <div class="boot">
+    <span class="bl">전제</span>
+    <span class="bstep">AppFitConfig.configure(환경)</span><span class="barr">&rarr;</span>
+    <span class="bstep">DioProvider(tokenManager, authProvider)</span><span class="barr">&rarr;</span>
+    <span class="bstep">앱이 REST 요청</span>
+  </div>
+
+  <div class="journey">
+
+    <div class="stage" style="--c:#8b5cf6;">
+      <div class="st-node">1</div>
+      <div class="st-card link" data-href="../c4core-l4-dio-provider.html">
+        <div class="st-head"><div class="st-title">요청 인터셉트</div><div class="st-actor">_AppFitAuthInterceptor.onRequest</div></div>
+        <div class="st-desc"><code>/auth/</code>가 아니면 shopCode를 6단 폴백(extra&rarr;헤더&rarr;쿼리&rarr;body&rarr;경로&rarr;<code>authProvider.currentStoreId</code>)으로 확보하고, password는 authProvider &rarr; SecureStorage 순으로 복원한다.</div>
+        <div class="chips"><span class="chip">shopCode 6단 폴백</span><span class="chip">password 복원</span></div>
+        <div class="drill">DioProvider L4 &rarr;</div>
+      </div>
+    </div>
+
+    <div class="stage" style="--c:#3b82f6;">
+      <div class="st-node">2</div>
+      <div class="st-card link" data-href="../c4core-l4-token-manager.html">
+        <div class="st-head"><div class="st-title">유효 토큰 확보</div><div class="st-actor">TokenManager.getValidToken</div></div>
+        <div class="st-desc">3단계로 토큰을 얻는다. 각 단계는 <b>shopCode 일치 + 미만료</b>일 때만 hit — 매장이 다르면 그 자리에서 폐기한다.</div>
+        <div class="gw">
+          <div class="gw-item"><div class="gn">① 메모리 캐시</div><div class="gc">_cachedToken · 가장 빠름</div></div>
+          <div class="gw-item"><div class="gn">② SecureStorage</div><div class="gc">저장 토큰 · legacy도 mismatch 폐기</div></div>
+          <div class="gw-item"><div class="gn">③ 신규 발급</div><div class="gc">sign-in API 호출</div></div>
+        </div>
+        <div class="drill">TokenManager L4 &rarr;</div>
+      </div>
+    </div>
+
+    <div class="stage" style="--c:#a78bfa;">
+      <div class="st-node">3</div>
+      <div class="st-card">
+        <div class="st-head"><div class="st-title">발급 직렬화</div><div class="st-actor">_refreshingFuture</div></div>
+        <div class="st-desc">동시에 여러 요청이 만료 토큰으로 도착해도 <b>동일 shopCode 발급은 1회</b>. 진행 중 발급의 매장이 <b>다르면 합류하지 않고</b> 완료를 기다린 뒤 자기 매장으로 재평가한다 — 남의 매장 토큰 오수신 방지.</div>
+        <div class="chips"><span class="chip">동일 shopCode → 합류</span><span class="chip warn">다른 shopCode → 대기 후 재평가</span></div>
+      </div>
+    </div>
+
+    <div class="stage" style="--c:#22d3ee;">
+      <div class="st-node">4</div>
+      <div class="st-card">
+        <div class="st-head"><div class="st-title">신규 발급 · 서명</div><div class="st-actor">Core REST API</div></div>
+        <div class="st-desc"><code>POST /v0/auth/sign-in {id, password}</code>로 <code>TokenInfo</code>를 받아 <b>shopCode 바인딩 후 캐시·저장</b>. API Key 검증은 <code>CryptoUtils</code> HMAC-SHA512 서명을 <code>Waldlust-Signature</code>에 실어 보낸다.</div>
+        <div class="chips"><span class="chip">/v0/auth/sign-in</span><span class="chip">HMAC-SHA512 서명</span><span class="chip"><span class="k">만료</span> isExpiringSoon 1h</span></div>
+      </div>
+    </div>
+
+    <div class="stage" style="--c:#f87171;">
+      <div class="st-node">5</div>
+      <div class="st-card link" data-href="../c4core-l4-dio-provider.html">
+        <div class="st-head"><div class="st-title">401 → 재발급 재시도</div><div class="st-actor">onError · 1회 제한</div></div>
+        <div class="st-desc">응답이 401이면 <code>clearToken</code> &rarr; <code>getValidToken</code> 재발급 &rarr; <code>_appfit_retried=true</code> 마킹 후 <code>dio.fetch</code>로 <b>1회</b> 재시도. 재시도 후에도 401이면 그대로 전파(무한 루프 차단). password 없으면 재로그인 필요.</div>
+        <div class="chips"><span class="chip">clearToken</span><span class="chip">_appfit_retried 1회</span><span class="chip warn">password 없으면 중단</span></div>
+        <div class="drill">DioProvider L4 &rarr;</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note"><b>이 흐름의 핵심:</b> 토큰 확보는 <b>캐시 우선 3단계</b>로 네트워크를 아끼고, shopCode 격리로 <b>매장 전환 시 남의 토큰이 절대 새지 않으며</b>, 동시 401 폭주는 <code>_refreshingFuture</code> 직렬화 + 요청당 <code>_appfit_retried</code> 1회 제한으로 <b>실제 로그인 API를 한 번</b>만 때린다.</div>
+</div>
+
+<script src="c4.js"></script>
+<script>
+document.querySelectorAll('.st-card.link').forEach(n=>{
+  n.addEventListener('click',()=>{const h=n.getAttribute('data-href');if(h)location.href=h;});
+});
+</script>
+</body>
+</html>

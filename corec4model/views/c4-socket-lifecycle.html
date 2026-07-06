@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 — 소켓 생명주기 (appfit_core)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4.css">
+<style>
+:root{--accent:#67e8f9;--accent-bg:rgba(34,211,238,.15);--accent-br:rgba(34,211,238,.35);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#06080d;color:#e2e8f0;min-height:100vh;overflow-y:auto;}
+code,.mono{font-family:'JetBrains Mono','Fira Code',monospace;}
+.ambient{position:fixed;border-radius:50%;filter:blur(120px);opacity:.07;pointer-events:none;z-index:0;}
+.amb1{width:600px;height:600px;background:#22d3ee;top:4%;left:18%;}
+.amb2{width:480px;height:480px;background:#3b82f6;top:45%;right:10%;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.03) 1px, transparent 0);background-size:48px 48px;z-index:0;pointer-events:none;}
+.main{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:30px 28px 90px;}
+.intro{font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6;}
+.intro b{color:#94a3b8;}
+.intro code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+.states{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+.stbox{flex:1;min-width:180px;border-radius:14px;padding:13px 15px;border:1.5px solid var(--sc,#334155);background:color-mix(in srgb,var(--sc,#334155) 8%,rgba(10,18,35,.7));}
+.stbox .sname{font-size:13.5px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--sc,#cbd5e1);}
+.stbox .sdesc{font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.45;}
+.stbox .strig{font-size:10px;color:#64748b;margin-top:6px;font-family:'JetBrains Mono',monospace;}
+.arrow-row{display:flex;justify-content:center;color:#334155;font-size:18px;margin:2px 0;}
+.trans{margin:22px 0;display:grid;gap:10px;}
+.tr{display:grid;grid-template-columns:210px 1fr;gap:12px;align-items:center;border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:10px 13px;background:rgba(10,18,35,.6);}
+.tr .tk{font-size:11.5px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#67e8f9;}
+.tr .tk .tarr{color:#475569;}
+.tr .tc{font-size:11.5px;color:#94a3b8;line-height:1.45;}
+.tr .tc code{font-size:10.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 4px;border-radius:3px;}
+.tr.warn{border-color:rgba(248,113,113,.25);}
+.tr.warn .tk{color:#fca5a5;}
+.tr.good{border-color:rgba(52,211,153,.25);}
+.tr.good .tk{color:#6ee7b7;}
+.sec-h{font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin:24px 0 10px;}
+.guards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.guard{border:1px solid rgba(139,92,246,.28);border-radius:10px;padding:10px 13px;background:rgba(139,92,246,.04);}
+.guard .gn{font-size:11.5px;font-weight:800;color:#c4b5fd;font-family:'JetBrains Mono',monospace;}
+.guard .gd{font-size:10.5px;color:#94a3b8;margin-top:3px;line-height:1.45;}
+.note{margin-top:24px;padding:14px 18px;background:rgba(34,211,238,.05);border:1px dashed rgba(34,211,238,.25);border-radius:12px;font-size:12.5px;color:#cbd5e1;line-height:1.65;}
+.note b{color:#67e8f9;}
+.note code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+.drill{display:inline-block;margin-top:12px;font-size:11px;font-weight:700;color:#67e8f9;text-decoration:none;}
+@media(max-width:680px){.main{padding:20px 12px 70px;}.tr{grid-template-columns:1fr;gap:4px;}.guards{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<header id="c4-hdr"></header>
+
+<div class="main">
+  <div class="intro"><code>AppFitNotifierService</code>는 WebSocket을 <b>스스로 살려두는 상태 머신</b>이다. 끊기면 지수 backoff로 재시도하고, 최대 횟수를 소진하면 능동 재시도를 멈추고 <b>네트워크 복원 이벤트</b>를 기다린다. 하트비트가 Ghost 연결을 감지해 강제로 재연결 궤도에 태운다. 상세는 <b>NotifierService L4</b>.</div>
+
+  <div class="sec-h">연결 상태 (ConnectionStatus)</div>
+  <div class="states">
+    <div class="stbox" style="--sc:#6ee7b7;"><div class="sname">initialConnected</div><div class="sdesc">앱 시작/로그인 후 최초 연결 성공</div><div class="strig">_hasEverConnected=false 일 때</div></div>
+    <div class="stbox" style="--sc:#34d399;"><div class="sname">reconnected</div><div class="sdesc">끊김 후 복구 성공</div><div class="strig">이후 성공은 전부 이 상태</div></div>
+    <div class="stbox" style="--sc:#fbbf24;"><div class="sname">reconnecting</div><div class="sdesc">backoff 대기 포함 재시도 중</div><div class="strig">_handleDisconnection 진입</div></div>
+    <div class="stbox" style="--sc:#fca5a5;"><div class="sname">disconnected</div><div class="sdesc">최대 초과 또는 의도적 종료</div><div class="strig">복원 이벤트 대기</div></div>
+  </div>
+
+  <div class="sec-h">전이 (Transition)</div>
+  <div class="trans">
+    <div class="tr good"><div class="tk">connect() <span class="tarr">→</span> initialConnected</div><div class="tc">apiKey를 <code>encryptAesGcm</code>로 암호화해 헤더에 싣고 <code>WebSocket.connect().timeout(20s)</code>. 성공 시 backoff·타이머 리셋 + heartbeat 시작</div></div>
+    <div class="tr warn"><div class="tk">open <span class="tarr">→</span> reconnecting</div><div class="tc">onError/onDone <b>또는</b> heartbeat(60s)가 <code>readyState != open</code> 감지 &rarr; <code>_handleDisconnection</code>(중복 가드) &rarr; cleanup &rarr; <code>_scheduleReconnect</code></div></div>
+    <div class="tr"><div class="tk">reconnecting <span class="tarr">↻</span> reconnecting</div><div class="tc">지연 <code>min(3 × 2^attempt, 300)</code>초 = 3→6→12→24→48→...→300. 시도 카운트 증가 후 타이머 예약</div></div>
+    <div class="tr warn"><div class="tk">reconnecting <span class="tarr">→</span> disconnected</div><div class="tc">시도 <b>5회 초과</b> 시 능동 재시도 중단 — <code>connectivity_plus</code> 복원 이벤트 대기 모드로</div></div>
+    <div class="tr good"><div class="tk">복원 이벤트 <span class="tarr">→</span> reconnecting</div><div class="tc"><code>notifyNetworkRestored()</code> — wifi/mobile/ethernet 감지 시 <b>backoff 초기화</b> 후 즉시 재연결(연결/시도 중이면 무시)</div></div>
+    <div class="tr"><div class="tk">disconnect() <span class="tarr">→</span> disconnected</div><div class="tc">로그아웃 — 타이머·connectivity·연결 정리 + 캐시 4종 null &rarr; 재연결 불가화</div></div>
+  </div>
+
+  <div class="sec-h">경합·중복 방지 가드</div>
+  <div class="guards">
+    <div class="guard"><div class="gn">_isConnecting</div><div class="gd">중복 연결 시도 차단</div></div>
+    <div class="guard"><div class="gn">_isHandlingDisconnection</div><div class="gd">heartbeat/onError/onDone 동시 호출에도 끊김 처리 1회</div></div>
+    <div class="guard"><div class="gn">_isDisposed</div><div class="gd">dispose 이후 모든 이벤트/add 차단</div></div>
+    <div class="guard"><div class="gn">cancelOnError · 리스너 cancel await</div><div class="gd">"close 직후 add" 레이스 방지</div></div>
+  </div>
+
+  <div class="sec-h">하트비트 · Ghost 감지</div>
+  <div class="trans">
+    <div class="tr"><div class="tk">heartbeat 60s</div><div class="tc">주기마다 <code>readyState</code> 점검 — open이 아니면 즉시 재연결 궤도. 정상 로그는 디버그 빌드만(프로덕션 노이즈 억제)</div></div>
+    <div class="tr"><div class="tk">wsPing 25s</div><div class="tc">프로토콜 레벨 ping — 서버 pong 미응답 시 <code>onDone</code> 자동 발화(OS 소켓이 감지)</div></div>
+    <div class="tr"><div class="tk">Ghost 임계 5분</div><div class="tc">마지막 메시지 후 5분 무수신은 의심 신호(readyState는 open인데 데이터 없음)</div></div>
+  </div>
+
+  <a class="drill" href="../c4core-l4-notifier-service.html">&rarr; NotifierService L4 상세</a>
+
+  <div class="note"><b>이 상태 머신의 핵심:</b> 소켓은 <b>실시간 채널이자 폴링의 트리거</b>다 — 소비자 앱은 <code>connectionStateStream</code>을 구독해 연결 시 60s·끊김 시 15s로 <b>폴링 간격을 조인다</b>(<code>AppFitSyncIntervals</code>). 즉 소켓이 죽어도 폴링이 안전망으로 주문을 계속 건져 올린다.</div>
+</div>
+
+<script src="c4.js"></script>
+</body>
+</html>

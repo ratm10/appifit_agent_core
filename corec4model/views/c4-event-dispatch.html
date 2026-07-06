@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 — 이벤트 분류 (appfit_core)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4.css">
+<style>
+:root{--accent:#c4b5fd;--accent-bg:rgba(139,92,246,.15);--accent-br:rgba(139,92,246,.35);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#06080d;color:#e2e8f0;min-height:100vh;overflow-y:auto;}
+code,.mono{font-family:'JetBrains Mono','Fira Code',monospace;}
+.ambient{position:fixed;border-radius:50%;filter:blur(120px);opacity:.07;pointer-events:none;z-index:0;}
+.amb1{width:600px;height:600px;background:#8b5cf6;top:4%;left:18%;}
+.amb2{width:480px;height:480px;background:#22d3ee;top:45%;right:10%;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.03) 1px, transparent 0);background-size:48px 48px;z-index:0;pointer-events:none;}
+.main{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:30px 28px 90px;}
+.intro{font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6;}
+.intro b{color:#94a3b8;}
+.intro code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+.raw{border:1px dashed rgba(139,92,246,.3);border-radius:12px;padding:12px 16px;margin-bottom:8px;background:rgba(139,92,246,.04);font-size:11.5px;color:#cbd5e1;font-family:'JetBrains Mono',monospace;line-height:1.5;}
+.raw .k{color:#67e8f9;}
+.funnel{position:relative;margin-top:6px;}
+.gate{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:center;position:relative;padding-bottom:14px;}
+.gate:not(:last-child)::after{content:'';position:absolute;left:21px;top:44px;bottom:-2px;width:2px;background:linear-gradient(180deg,#8b5cf6,rgba(255,255,255,.05));opacity:.5;}
+.gnode{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#06080d;background:#8b5cf6;box-shadow:0 0 20px -6px #8b5cf6;position:relative;z-index:2;}
+.gcard{background:rgba(10,18,35,.78);border:1.5px solid rgba(255,255,255,.08);border-radius:13px;padding:12px 16px;}
+.gcard .gt{font-size:14px;font-weight:800;color:#f1f5f9;}
+.gcard .gd{font-size:11.5px;color:#94a3b8;margin-top:4px;line-height:1.45;}
+.gcard .gd code{font-size:10.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 4px;border-radius:3px;}
+.fail-tag{font-size:10.5px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#fca5a5;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.28);border-radius:8px;padding:5px 10px;white-space:nowrap;}
+.fail-tag.ign{color:#fbbf24;background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.28);}
+.accepted{margin-top:8px;display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:center;}
+.anode{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#06080d;background:#34d399;box-shadow:0 0 22px -4px #34d399;}
+.acard{border:1.5px solid rgba(52,211,153,.4);border-radius:13px;padding:13px 16px;background:linear-gradient(135deg,rgba(6,78,59,.25),rgba(10,18,35,.75));}
+.acard .at{font-size:14px;font-weight:800;color:#6ee7b7;}
+.acard .ad{font-size:11.5px;color:#cbd5e1;margin-top:4px;line-height:1.5;}
+.acard .ad code{font-size:10.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 4px;border-radius:3px;}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;}
+.scol{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 15px;background:rgba(10,18,35,.6);}
+.scol .sh{font-size:12px;font-weight:800;color:#c4b5fd;margin-bottom:7px;}
+.scol .si{font-size:11px;color:#94a3b8;line-height:1.5;padding-left:13px;position:relative;margin-bottom:4px;}
+.scol .si::before{content:'\25B8';position:absolute;left:0;color:#8b5cf6;font-size:8px;top:4px;}
+.scol .si code{font-size:10px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 4px;border-radius:3px;}
+.drill{display:inline-block;margin-top:14px;font-size:11px;font-weight:700;color:#c4b5fd;text-decoration:none;}
+.note{margin-top:22px;padding:14px 18px;background:rgba(139,92,246,.05);border:1px dashed rgba(139,92,246,.25);border-radius:12px;font-size:12.5px;color:#cbd5e1;line-height:1.65;}
+.note b{color:#c4b5fd;}
+.note code{font-size:11.5px;color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;}
+@media(max-width:680px){.main{padding:20px 12px 70px;}.gate{grid-template-columns:36px 1fr;gap:10px;}.fail-tag{grid-column:2;justify-self:start;margin-top:4px;}.gate:not(:last-child)::after{left:17px;}.split{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<header id="c4-hdr"></header>
+
+<div class="main">
+  <div class="intro">소켓이 뿜은 raw <code>Map</code> 한 건이 <code>SocketEventDispatcher.classify()</code>를 통과하며 <b>순차 게이트</b>를 거친다. 어느 게이트든 걸리면 즉시 해당 사유로 반환되고, 전부 통과해야 <b>accepted</b>. 도메인 후속 처리는 흡수하지 않으므로 <b>결과 분기는 호출자 몫</b>. 상세는 <b>Dispatcher L4</b>.</div>
+
+  <div class="raw"><span class="k">{ eventType:</span> "ORDER_CREATED", <span class="k">payload:</span> { orderNo, shopOrderNo, shopCode, ... } <span class="k">}</span></div>
+
+  <div class="funnel">
+    <div class="gate">
+      <div class="gnode">1</div>
+      <div class="gcard"><div class="gt">파싱</div><div class="gd"><code>SocketEventPayload.fromSocketMessage</code> — try/catch. orderId는 <code>orderNo</code> 우선, 없으면 <code>orderId</code></div></div>
+      <div class="fail-tag">✗ invalidPayload</div>
+    </div>
+    <div class="gate">
+      <div class="gnode">2</div>
+      <div class="gcard"><div class="gt">유효성</div><div class="gd"><code>eventTypeRaw</code> 존재 · <code>eventType</code> enum 매칭 · payload 비어있지 않음 · <code>hasOrderId</code></div></div>
+      <div class="fail-tag">✗ invalidPayload / unknownEventType</div>
+    </div>
+    <div class="gate">
+      <div class="gnode">3</div>
+      <div class="gcard"><div class="gt">매장 일치</div><div class="gd">payload <code>shopCode</code>가 있고 <code>resolveStoreId()</code>와 다르면(대소문자 무시) 컷</div></div>
+      <div class="fail-tag ign">⊘ ignoredByShopCode</div>
+    </div>
+    <div class="gate">
+      <div class="gnode">4</div>
+      <div class="gcard"><div class="gt">도메인 정책</div><div class="gd">주입된 <code>shouldIgnore(type, payload)</code>가 true면 컷 — KDS NEW 차단·디스플레이 전용 등</div></div>
+      <div class="fail-tag ign">⊘ ignoredByPolicy</div>
+    </div>
+  </div>
+
+  <div class="accepted">
+    <div class="anode">&#10003;</div>
+    <div class="acard"><div class="at">accepted</div><div class="ad">전 게이트 통과 — 호출자가 <code>outcome.payload</code>를 받아 <b>상세조회·state 업데이트·출력</b> 등 도메인 후속 처리를 진행한다. 이 후속은 앱마다 달라 베이스에 흡수하지 않는다.</div></div>
+  </div>
+
+  <div class="split">
+    <div class="scol">
+      <div class="sh">주입 정책 (shouldIgnore)</div>
+      <div class="si"><code>OrderEventIgnorePolicy.ignoreNewOrderInKdsMode</code> — agent KDS 모드는 NEW 무시</div>
+      <div class="si"><code>ignoreForDisplayOnly</code> — DID는 ORDER_CREATED/REJECTED 무시</div>
+    </div>
+    <div class="scol">
+      <div class="sh">별도 흐름 — 기기 명령 (v1.1.0)</div>
+      <div class="si"><code>DeviceCommandPayload.isDeviceCommand(data)</code>로 <b>이 분류기 진입 전</b> 가로챔</div>
+      <div class="si">LOG_UPLOAD / STATUS_REPORT — 주문 파이프라인과 무관, 관재 채널</div>
+    </div>
+  </div>
+
+  <a class="drill" href="../c4core-l4-socket-dispatcher.html">&rarr; SocketEventDispatcher L4 상세</a>
+
+  <div class="note"><b>이 분류기의 핵심:</b> raw 메시지의 <b>모든 실패 경우의 수</b>(파싱 실패·미지 타입·타 매장·정책)를 <code>SocketDispatchKind</code> 5종으로 <b>명시적 값</b>으로 만들어, 양 앱(agent·DID)이 <code>outcome.kind</code>로만 분기하면 되게 한다 — silent drop이 사라지고 무시 사유가 <code>reason</code>으로 로깅된다.</div>
+</div>
+
+<script src="c4.js"></script>
+</body>
+</html>

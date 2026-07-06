@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — AppFitTokenManager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#3b82f6;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#8b5cf6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.swap{position:fixed;top:60px;right:18px;z-index:30;font-size:12px;color:#c4b5fd;text-decoration:none;padding:5px 12px;border:1px solid rgba(139,92,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.swap:hover{background:rgba(139,92,246,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — AppFitTokenManager</h1>
+  <div class="sub mono">lib/src/auth/token_manager.dart</div>
+</div>
+<a class="back" href="c4core-l3-auth-crypto.html">&larr; L3 Components</a>
+<a class="swap" href="c4core-l4-crypto-utils.html">CryptoUtils &rarr;</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-auth-crypto.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">JWT 토큰의 <b>발급·캐싱·갱신</b> 단일 책임자. <b>메모리 캐시 &rarr; SecureStorage &rarr; 신규 발급</b> 3단계로 유효 토큰을 확보하고, 동시 401이 몰려도 동일 shopCode 발급은 <code>_refreshingFuture</code>로 <b>정확히 1회</b>만 수행한다. 캐시/저장 토큰은 shopCode로 격리되어 매장 전환 시 즉시 폐기된다.</div>
+
+  <div class="sec"><span class="sd" style="background:#3b82f6;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">생성자 주입: projectId · baseUrl · AppFitLogger?</div>
+      <div class="class-name">AppFitTokenManager</div>
+      <div class="class-layer">인증 토큰 관리자 — SecureStorage 백엔드 · 인터셉터 없는 전용 Dio</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#60a5fa;"></span>의존</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">FlutterSecureStorage</span><span class="dep-ds">토큰·만료·shopCode·비밀번호·projectId·apiKey (7 키)</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">Dio (로컬)</span><span class="dep-ds">인터셉터 없는 sign-in/validate 전용 인스턴스</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">CryptoUtils</span><span class="dep-ds">validateApiKey의 HMAC-SHA512 서명</span></div>
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">AppFitLogger</span><span class="dep-ds">주입 로거 (기본 DefaultAppFitLogger)</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#60a5fa;"></span>주요 메서드 <span style="font-size:10.5px;color:#475569;font-weight:500;">(R 조회 / W 변경 / P 내부)</span></div>
+    <div class="methods">
+
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">getValidToken()</span><span class="m-sig">(shopCode, {password}) → Future&lt;String&gt;</span><span class="m-tag">3단계 + 직렬화</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">① 메모리 캐시 (shopCode 일치+미만료)</span><span class="md-arr">→</span>
+            <span class="md-step">② SecureStorage 토큰 (동일 검증)</span><span class="md-arr">→</span>
+            <span class="md-step hot">③ 신규 발급 (_issueAndCache)</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">격리</div><div class="md-v">캐시/저장 토큰의 <code>shopCode</code>가 요청과 다르면(매장 전환) <b>폐기 후 재발급</b>. legacy 토큰(shopCode==null)도 mismatch로 간주해 1회 재발급으로 마이그레이션</div></div>
+          <div class="md-row"><div class="md-l">직렬화</div><div class="md-v">진행 중 발급(<code>_refreshingFuture</code>)이 <b>동일 shopCode</b>면 합류해 결과 공유. <b>다른 shopCode</b>면 합류 금지 — 완료를 기다린 뒤(결과·예외 무시) <code>getValidToken</code> 재귀 재평가</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-p">P</div>
+        <div class="m-head"><span class="m-name">_issueAndCache()</span><span class="m-sig">(shopCode, {password}) → Future&lt;String&gt;</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-v"><code>issueToken</code> &rarr; <code>copyWith(shopCode)</code> 바인딩 &rarr; SecureStorage 저장 &rarr; 메모리 캐시. <code>getValidToken</code> 4단계에서 <code>_refreshingFuture</code>/<code>_refreshingShopCode</code>에 등록 후 finally에서 해제</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">issueToken()</span><span class="m-sig">(shopCode, {password}) → Future&lt;TokenInfo&gt;</span><span class="m-tag">Method 2 로그인</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">API</div><div class="md-v"><code>POST /v0/auth/sign-in</code> {id, password} — 200이면 <code>response.data['data']</code>를 TokenInfo로 파싱. password 없으면 즉시 Exception</div></div>
+          <div class="md-row"><div class="md-l">에러</div><div class="md-v">DioException을 <b>collapse하지 않고 rethrow</b> — 소비자가 status·서버 message·type으로 구조화 처리 가능(메인 인터셉터와 동일 계약)</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">validateApiKey()</span><span class="m-sig">() → Future&lt;bool&gt;</span><span class="m-tag">HMAC 서명</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">저장 projectId+apiKey 로드</span><span class="md-arr">→</span>
+            <span class="md-step">UTC ISO datetime(밀리초 3자리 고정)</span><span class="md-arr">→</span>
+            <span class="md-step hot">HMAC-SHA512 서명</span><span class="md-arr">→</span>
+            <span class="md-step">POST /v0/auth/api-key/validate</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">헤더</div><div class="md-v"><code>Waldlust-Signature</code>에 CryptoUtils 서명. 응답 <code>data.isActive</code> 반환. 오류 시 false</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">savePassword / loadPassword / clearPassword</span><span class="m-sig">SecureStorage 비밀번호</span><span class="m-tag">⚠ 평문</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">경고</div><div class="md-v">FlutterSecureStorage(Keychain/Keystore)에 저장하지만 <b>값 자체는 평문</b> — 플랫폼 보안 손상 시 노출. 장기적으로 refresh token 등 passwordless 전환 권장. 인터셉터가 401 재발급 시 password 폴백으로 사용</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">saveProjectCredentials / getStoredProjectId / getStoredApiKey / clearProjectCredentials</span><span class="m-sig">프로젝트 자격증명</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">용도</div><div class="md-v">로그인 시 획득한 projectId·apiKey 보관 — DioProvider가 요청마다 <code>Waldlust-Project-ID</code> 헤더 주입에 사용. 환경 전환/로그아웃 시 clear</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">clearToken()</span><span class="m-sig">() → Future&lt;void&gt;</span><span class="m-tag">로그아웃·401</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v">token·expires·shopCode·dynamicApiKey 삭제 + <code>_cachedToken=null</code>. DioProvider 401 핸들러가 재발급 직전 호출</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">getStoredTokenShopCode()</span><span class="m-sig">() → Future&lt;String?&gt;</span><span class="m-tag">prefix 전환 감지</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">용도</div><div class="md-v">만료 여부와 무관하게 저장 토큰의 매장 코드 조회 — 소비자 앱이 새 로그인 직전 <b>prefix 전환</b>을 감지해 projectId/apiKey/password까지 함께 정리</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#22d3ee;"></span>값 객체 · 내부 상태</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#67e8f9;background:rgba(34,211,238,.1);">값 객체 (수동 작성)</div>
+      <div class="entity-name">TokenInfo</div>
+      <div class="entity-tag">token · expiresAt · shopCode? — ==/hashCode/copyWith 직접 구현</div>
+    </div>
+    <div class="fgt">필드 · getter</div>
+    <div class="fields">
+      <div class="field"><span class="f-col">token</span><span class="f-type">String</span><span class="f-desc">JWT (toString에서 마스킹 — 민감정보)</span></div>
+      <div class="field"><span class="f-col">expiresAt</span><span class="f-type">DateTime</span><span class="f-desc">실제 만료 시각</span></div>
+      <div class="field"><span class="f-col">shopCode</span><span class="f-type">String?</span><span class="f-desc">발급 매장 (nullable — legacy 호환, mismatch 폐기 기준)</span></div>
+      <div class="field"><span class="f-col">isExpired</span><span class="f-type">bool</span><span class="f-desc">now &gt; expiresAt</span></div>
+      <div class="field"><span class="f-col">isExpiringSoon</span><span class="f-type">bool</span><span class="f-desc">만료 1시간 이내</span></div>
+    </div>
+    <div class="fgt">Notifier 내부 필드 (동시 발급 직렬화)</div>
+    <div class="fields">
+      <div class="field"><span class="f-col">_cachedToken</span><span class="f-type">TokenInfo?</span><span class="f-desc">메모리 1차 캐시</span></div>
+      <div class="field"><span class="f-col">_refreshingFuture</span><span class="f-type">Future&lt;String&gt;?</span><span class="f-desc">진행 중 발급 (동일 shopCode 공유)</span></div>
+      <div class="field"><span class="f-col">_refreshingShopCode</span><span class="f-type">String?</span><span class="f-desc">진행 중 발급 대상 (합류 판정)</span></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#34d399;"></span>호출하는 외부 인터페이스</div>
+  <div class="ifc-card">
+    <div class="ifc-list">
+      <div class="ifc"><span class="ifc-m im-post">POST</span><span class="ifc-p">/v0/auth/sign-in {id, password}</span><span class="ifc-d">토큰 발급 (Method 2 로그인)</span></div>
+      <div class="ifc"><span class="ifc-m im-post">POST</span><span class="ifc-p">/v0/auth/api-key/validate + Waldlust-Signature</span><span class="ifc-d">API Key 유효성 (isActive)</span></div>
+      <div class="ifc"><span class="ifc-m im-ch">STORAGE</span><span class="ifc-p">FlutterSecureStorage read/write/delete</span><span class="ifc-d">토큰·비밀번호·프로젝트 자격증명</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.method').forEach(m=>{/* accordion via inline onclick */});
+</script>
+</body>
+</html>

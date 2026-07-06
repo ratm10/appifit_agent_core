@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0">
+<title>C4 · L2 — Container (appfit_core)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+#scene{min-width:1040px;}
+.amb1{width:560px;height:560px;background:#3b82f6;top:22%;left:34%;}
+.amb2{width:440px;height:440px;background:#10b981;top:58%;right:14%;}
+.back{position:fixed;top:62px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.note-lib{position:fixed;bottom:16px;right:18px;z-index:30;max-width:300px;font-size:10px;color:#94a3b8;line-height:1.55;background:rgba(6,8,13,.72);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:10px 13px;}
+.note-lib b{color:#93c5fd;}
+#el-http-auth{transform:translateY(-4px);}
+#el-mon-socket{transform:translateY(34px);}
+#el-mon-http{transform:translateY(6px);}
+</style>
+</head>
+<body class="bg-grid">
+
+<div class="ambient amb1"></div>
+<div class="ambient amb2"></div>
+
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 2 — Container</h1>
+  <div class="sub">appfit_core &middot; lib/src 논리 모듈 구조</div>
+</div>
+<a class="back" href="c4core-context.html">&larr; L1 System Context</a>
+
+<div id="scene">
+  <svg id="edges"></svg>
+
+  <div class="boundary" style="left:22%;top:15%;width:56%;height:72%;">
+    <div class="boundary-label">&#128230; appfit_core — Package Boundary (lib/appfit_core.dart 단일 export)</div>
+  </div>
+
+  <!-- ===== 논리 모듈 7 (전부 클릭 → L3) ===== -->
+  <div class="node container-node clickable" id="c-config" style="left:31%;top:24%;" data-href="c4core-l3-config.html">
+    <h3>Config</h3><div class="ty">[config/]</div><div class="de">AppFitConfig 환경 enum·URL·타임아웃·폴링</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-auth" style="left:55%;top:24%;" data-href="c4core-l3-auth-crypto.html">
+    <h3>Auth &amp; Crypto</h3><div class="ty">[auth/]</div><div class="de">TokenManager 3단계·CryptoUtils AES/HMAC</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-http" style="left:31%;top:41%;" data-href="c4core-l3-http.html">
+    <h3>HTTP</h3><div class="ty">[http/]</div><div class="de">DioProvider 인터셉터·ApiRoutes·예외 매핑</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-socket" style="left:55%;top:41%;" data-href="c4core-l3-socket-events.html">
+    <h3>Socket &amp; Events</h3><div class="ty">[socket/ · events/]</div><div class="de">NotifierService 재연결·Dispatcher 분류</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-cache" style="left:31%;top:59%;" data-href="c4core-l3-cache-utils.html">
+    <h3>Cache &amp; Utils</h3><div class="ty">[cache/ · utils/]</div><div class="de">dedup·부활차단·배치 머지 버퍼</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-mon" style="left:55%;top:59%;" data-href="c4core-l3-monitoring-logging.html">
+    <h3>Monitoring &amp; Logging</h3><div class="ty">[monitoring/ · logging/]</div><div class="de">Sentry 쿨다운·플래핑·로거 데코레이터</div><div class="drill">L3 &rarr;</div>
+  </div>
+  <div class="node container-node clickable" id="c-ota" style="left:43%;top:76%;" data-href="c4core-l3-ota.html">
+    <h3>OTA</h3><div class="ty">[ota/]</div><div class="de">OtaUpdateManager APK 다운로드·설치 (Android)</div><div class="drill">L3 &rarr;</div>
+  </div>
+
+  <!-- ===== 경계 밖 — L1 외부 (단순화 재등장) ===== -->
+  <div class="node actor" id="n-consumers" style="left:6%;top:41%;"><h3>소비자 앱</h3><div class="ty">[Order Agent · DID · Kiosk]</div></div>
+  <div class="node external" id="n-coreapi" style="left:88%;top:24%;"><h3>Core REST API</h3><div class="ty">[External · HTTPS]</div></div>
+  <div class="node external" id="n-notifier" style="left:88%;top:41%;"><h3>Notifier</h3><div class="ty">[External · WSS]</div></div>
+  <div class="node external" id="n-ext" style="left:86%;top:66%;"><h3>Sentry / OTA Host</h3><div class="ty">[External]</div></div>
+
+  <!-- edge labels -->
+  <div class="edge-label la-int" id="el-http-auth">토큰 주입 · 401 재발급</div>
+  <div class="edge-label la-int" id="el-http-config">baseUrl · 타임아웃</div>
+  <div class="edge-label la-int" id="el-socket-auth">apiKey AES-GCM 암호화</div>
+  <div class="edge-label la-int" id="el-socket-config">websocketUrl</div>
+  <div class="edge-label la-int" id="el-mon-socket">ConnectionStatus 구독</div>
+  <div class="edge-label la-int" id="el-mon-http">ApiHttpException 승격</div>
+  <div class="edge-label la-actor" id="el-consumers-http">REST 호출 (DioProvider)</div>
+  <div class="edge-label la-ext" id="el-http-coreapi">인증 요청</div>
+  <div class="edge-label la-ext" id="el-socket-notifier">WSS 구독</div>
+  <div class="edge-label la-ext" id="el-mon-ext">에러·APK 조회</div>
+</div>
+
+<div class="legend">
+  <div class="leg"><b class="lb-c"></b>논리 모듈</div>
+  <div class="leg"><b class="lb-a"></b>소비자 앱</div>
+  <div class="leg"><b class="lb-e"></b>외부 시스템</div>
+</div>
+
+<div class="note-lib"><b>왜 "컨테이너"가 프로세스가 아닌가:</b> appfit_core는 단일 패키지라 런타임 컨테이너(별도 실행 단위)가 없다. 여기 박스는 <b>lib/src의 논리 모듈 그룹</b>이며, 실제 실행은 이들을 링크한 소비자 앱 프로세스 안에서 일어난다.</div>
+
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <span class="on" title="L2 Container">L2</span>
+  <span class="off" title="L3 Component">L3</span>
+  <span class="off" title="L4 Code">L4</span>
+</div>
+
+<script src="c4core.js"></script>
+<script>
+c4Graph([
+  {from:'c-http',      to:'c-auth',     type:'int',   label:'el-http-auth',      dash:false},
+  {from:'c-http',      to:'c-config',   type:'int',   label:'el-http-config',    dash:false},
+  {from:'c-socket',    to:'c-auth',     type:'int',   label:'el-socket-auth',    dash:false},
+  {from:'c-socket',    to:'c-config',   type:'int',   label:'el-socket-config',  dash:false},
+  {from:'c-mon',       to:'c-socket',   type:'int',   label:'el-mon-socket',     dash:false},
+  {from:'c-mon',       to:'c-http',     type:'int',   label:'el-mon-http',       dash:false},
+  {from:'n-consumers', to:'c-http',     type:'actor', label:'el-consumers-http', dash:false},
+  {from:'c-http',      to:'n-coreapi',  type:'ext',   label:'el-http-coreapi',   dash:false},
+  {from:'c-socket',    to:'n-notifier', type:'ext',   label:'el-socket-notifier',dash:true},
+  {from:'c-mon',       to:'n-ext',      type:'ext',   label:'el-mon-ext',        dash:false},
+]);
+
+document.querySelectorAll('.container-node.clickable').forEach(n => {
+  let px, py;
+  n.addEventListener('mousedown', e => { px = e.clientX; py = e.clientY; });
+  n.addEventListener('mouseup', e => {
+    if (Math.abs(e.clientX-px) < 5 && Math.abs(e.clientY-py) < 5) {
+      const h = n.getAttribute('data-href'); if (h) location.href = h;
+    }
+  });
+});
+</script>
+</body>
+</html>

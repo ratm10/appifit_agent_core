@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — MonitoringService</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#ef4444;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#3b82f6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — MonitoringService</h1>
+  <div class="sub mono">lib/src/monitoring/monitoring_service.dart</div>
+</div>
+<a class="back" href="c4core-l3-monitoring-logging.html">&larr; L3 Components</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-monitoring-logging.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">Sentry 위에 <b>노이즈 억제 계층</b>을 얹은 싱글톤. 소켓 상태가 요동쳐도 <b>60초 쿨다운</b>·<b>플래핑 감지(5분 6회)</b>로 breadcrumb 폭주를 막고, 동일 오류 타입은 <b>5분 쿨다운</b>으로 이슈 중복을 억제한다. 성능 트레이싱·세션 트래킹은 꺼진 채 초기화되어 <b>순수 오류 모니터링</b>만 한다.</div>
+
+  <div class="sec"><span class="sd" style="background:#ef4444;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">MonitoringService._() · static final instance</div>
+      <div class="class-name">MonitoringService</div>
+      <div class="class-layer">싱글톤 — Sentry 데코레이션 + 쿨다운/플래핑 상태</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#fca5a5;"></span>의존</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">SentryFlutter / Sentry</span><span class="dep-ds">init · captureException · addBreadcrumb · configureScope</span></div>
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">MonitoringContext</span><span class="dep-ds">소비자 구현 — user/tag/context 매핑</span></div>
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">ConnectionStatus</span><span class="dep-ds">notifier_service 상태 enum</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#fca5a5;"></span>주요 메서드</div>
+    <div class="methods">
+
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">init()</span><span class="m-sig">({dsn, context}) → Future&lt;void&gt;</span><span class="m-tag">1회</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">설정</div><div class="md-v"><code>release = appType@version+build</code> · <code>tracesSampleRate=0</code> · <code>enableAutoSessionTracking=false</code> · <code>attachStacktrace=true</code>. 이미 초기화면 무시</div></div>
+          <div class="md-row"><div class="md-l">스코프</div><div class="md-v"><code>_applyScope</code>로 user·app_type·environment·store_id·device 태그/컨텍스트 설정</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">onConnectionStatusChanged()</span><span class="m-sig">(ConnectionStatus) → void</span><span class="m-tag">노이즈 억제 핵심</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">전환 목록에 now 추가·5분 밖 제거</span><span class="md-arr">→</span>
+            <span class="md-step hot">플래핑 진입? (≥6회)</span><span class="md-arr">→</span>
+            <span class="md-step">플래핑 중? 안정화 타이머 재시작</span><span class="md-arr">→</span>
+            <span class="md-step">60s 쿨다운 체크</span><span class="md-arr">→</span>
+            <span class="md-step">breadcrumb + 태그</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">플래핑</div><div class="md-v">5분 내 6회 이상 전환 시 <code>captureMessage(warning)</code> 1건만 보내고 개별 이벤트 <b>중단</b>. 2분간 추가 전환 없으면 해제(<code>_onFlappingStabilized</code>) 후 resolved 알림</div></div>
+          <div class="md-row"><div class="md-l">쿨다운</div><div class="md-v">동일 전환키(<code>prev→cur</code>)는 60초 내 재전송 안 함 — 생략 횟수는 다음 전송에 "(N회 생략 후 전송)"으로 합산</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">captureError()</span><span class="m-sig">(exception, stack, {hint, extras, fingerprint, cooldownKey})</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">쿨다운</div><div class="md-v">버킷 키는 <code>cooldownKey ?? runtimeType</code>. 쿨다운 중(5분)이면 <b>breadcrumb으로만</b> 기록하고 이슈 미전송. HTTP 오류처럼 타입이 뭉치면 endpoint+status 키를 넘겨 서로 다른 오류의 상호 차단 방지</div></div>
+          <div class="md-row"><div class="md-l">승격</div><div class="md-v"><code>extras['http.status'/'server.code'/'http.path']</code>를 검색 가능 태그로 승격 + fingerprint로 그룹핑 제어</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">addBreadcrumb() · updateContext() · updateStoreInfo()</span><span class="m-sig">컨텍스트</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v">정보성 breadcrumb 추가(이슈 미생성) · 로그인 후 전체 컨텍스트 교체 · 매장 정보만 갱신(앱/기기 유지)</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">dispose() · resetForTesting()</span><span class="m-sig">정리</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v">플래핑 타이머·쿨다운 맵·전환 목록 정리 + <code>_initialized=false</code>(재 init 허용). <b><code>Sentry.close()</code>는 호출 안 함</b> — 필요 시 소비자가 별도 호출</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#f59e0b;"></span>쿨다운 · 플래핑 상수/상태</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#fbbf24;background:rgba(245,158,11,.1);">상수 · 상태</div>
+      <div class="entity-name">노이즈 억제 파라미터</div>
+      <div class="entity-tag">monitoring_service.dart</div>
+    </div>
+    <div class="fields">
+      <div class="field"><span class="f-col">_transitionCooldown</span><span class="f-type">60s</span><span class="f-desc">동일 상태 전환 재전송 간격</span></div>
+      <div class="field"><span class="f-col">_errorCooldown</span><span class="f-type">5분</span><span class="f-desc">동일 오류 타입 재전송 간격</span></div>
+      <div class="field"><span class="f-col">_flappingThreshold / Window</span><span class="f-type">6회 / 5분</span><span class="f-desc">플래핑 진입 조건</span></div>
+      <div class="field"><span class="f-col">_flappingStabilityDuration</span><span class="f-type">2분</span><span class="f-desc">추가 전환 없으면 해제</span></div>
+      <div class="field"><span class="f-col">_recentTransitions / _isFlapping</span><span class="f-type">List / bool</span><span class="f-desc">전환 이력·플래핑 상태</span></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#34d399;"></span>Sentry 전송 (외부)</div>
+  <div class="ifc-card">
+    <div class="ifc-list">
+      <div class="ifc"><span class="ifc-m im-post">SENTRY</span><span class="ifc-p">captureException(e, stackTrace, withScope: tags/fingerprint)</span><span class="ifc-d">치명적/미기대 오류 (쿨다운 통과분)</span></div>
+      <div class="ifc"><span class="ifc-m im-ch">SENTRY</span><span class="ifc-p">addBreadcrumb(socket/error/app)</span><span class="ifc-d">추적 trail — 쿨다운·플래핑·정보성</span></div>
+      <div class="ifc"><span class="ifc-m im-ch">SENTRY</span><span class="ifc-p">captureMessage(flapping detected/resolved)</span><span class="ifc-d">플래핑 요약 1건</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

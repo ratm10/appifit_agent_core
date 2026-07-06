@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — SocketEventDispatcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#8b5cf6;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#22d3ee;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.swap{position:fixed;top:60px;right:18px;z-index:30;font-size:12px;color:#67e8f9;text-decoration:none;padding:5px 12px;border:1px solid rgba(34,211,238,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.swap:hover{background:rgba(34,211,238,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+.route{margin-top:6px;display:grid;gap:7px;}
+.rrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 11px;background:rgba(10,18,35,.6);}
+.rk{font-size:11px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.rk.ok{color:#6ee7b7;} .rk.bad{color:#fca5a5;} .rk.ign{color:#fbbf24;}
+.rc{font-size:11px;color:#94a3b8;line-height:1.45;}
+.rc code{color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 4px;border-radius:3px;font-size:10px;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — SocketEventDispatcher</h1>
+  <div class="sub mono">lib/src/socket/socket_event_dispatcher.dart</div>
+</div>
+<a class="back" href="c4core-l3-socket-events.html">&larr; L3 Components</a>
+<a class="swap" href="c4core-l4-notifier-service.html">NotifierService &rarr;</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-socket-events.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">양 앱(agent·DID)이 중복 구현하던 소켓 전처리를 응축한 <b>베이스 헬퍼</b>. raw <code>Map</code> 한 건을 받아 <b>파싱 &rarr; 유효성 &rarr; 매장 일치 &rarr; 정책</b> 순으로 검사하고, 그 결과를 <code>SocketDispatchOutcome</code> 값 객체로 돌려준다. <b>도메인 후속 처리(상세조회·state·출력)는 흡수하지 않는다</b> — 그 책임은 앱마다 다르므로 호출자 몫.</div>
+
+  <div class="sec"><span class="sd" style="background:#8b5cf6;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">생성자 주입: resolveStoreId() · shouldIgnore()?</div>
+      <div class="class-name">SocketEventDispatcher</div>
+      <div class="class-layer">순수 분류기 — 상태 없음 · 도메인 정책은 콜백으로 외부 주입</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#c4b5fd;"></span>주입 콜백</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">resolveStoreId()</span><span class="dep-ds">매장 코드 검증용 (null이면 검증 스킵)</span></div>
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">shouldIgnore(type, payload)?</span><span class="dep-ds">도메인 정책 — KDS NEW 차단·디스플레이 전용 등</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">SocketEventPayload.fromSocketMessage</span><span class="dep-ds">raw → 값 객체 파싱</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#c4b5fd;"></span>메서드</div>
+    <div class="methods">
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">classify()</span><span class="m-sig">(Map data) → SocketDispatchOutcome</span><span class="m-tag">단일 진입점</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">순서</div><div class="md-flow">
+            <span class="md-step">파싱 try/catch</span><span class="md-arr">→</span>
+            <span class="md-step">eventTypeRaw·eventType·payload·orderId 유효성</span><span class="md-arr">→</span>
+            <span class="md-step hot">shopCode 대소문자 무시 비교</span><span class="md-arr">→</span>
+            <span class="md-step">shouldIgnore 정책</span><span class="md-arr">→</span>
+            <span class="md-step">accepted</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">단락</div><div class="md-v">각 검사 실패 시 즉시 해당 kind로 반환(reason 포함). payload에 shopCode가 있고 우리 매장과 다르면 <code>ignoredByShopCode</code></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#34d399;"></span>분류 결과 — SocketDispatchKind 5종</div>
+  <div class="entity-card">
+    <div class="route">
+      <div class="rrow"><span class="rk ok">accepted</span><span class="rc">파싱 가능 + 정책 통과 → 호출자가 <code>outcome.payload</code>로 도메인 처리(상세조회·state·출력)</span></div>
+      <div class="rrow"><span class="rk bad">invalidPayload</span><span class="rc">파싱 실패 / eventType 누락 / 빈 payload / orderId 누락 (reason 명시)</span></div>
+      <div class="rrow"><span class="rk bad">unknownEventType</span><span class="rc">eventTypeRaw는 있으나 enum 미매칭 — 서버 신규 추가분 등</span></div>
+      <div class="rrow"><span class="rk ign">ignoredByShopCode</span><span class="rc">다른 매장 이벤트 (<code>expected != got</code>)</span></div>
+      <div class="rrow"><span class="rk ign">ignoredByPolicy</span><span class="rc">도메인 정책 무시 — KDS NEW, 디스플레이 전용 CREATED/REJECTED 등</span></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#22d3ee;"></span>결과 값 객체</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#67e8f9;background:rgba(34,211,238,.1);">immutable</div>
+      <div class="entity-name">SocketDispatchOutcome</div>
+      <div class="entity-tag">private 생성자 · isAccepted getter</div>
+    </div>
+    <div class="fields">
+      <div class="field"><span class="f-col">kind</span><span class="f-type">SocketDispatchKind</span><span class="f-desc">5종 분류</span></div>
+      <div class="field"><span class="f-col">payload</span><span class="f-type">SocketEventPayload?</span><span class="f-desc">파싱 성공 시 (실패 시 null 가능)</span></div>
+      <div class="field"><span class="f-col">reason</span><span class="f-type">String?</span><span class="f-desc">비-accepted 사유 (로깅용)</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0">
+<title>C4 · L1 — System Context (appfit_core)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#3b82f6;top:22%;left:30%;}
+.amb2{width:460px;height:460px;background:#10b981;top:52%;left:10%;}
+</style>
+</head>
+<body class="bg-grid">
+
+<div class="ambient amb1"></div>
+<div class="ambient amb2"></div>
+
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 1 — System Context</h1>
+  <div class="sub">appfit_core &middot; 매장 운영 앱군 공유 Flutter 패키지</div>
+</div>
+
+<div id="scene">
+  <svg id="edges"></svg>
+
+  <div class="node center-node" id="n-core">
+    <h2>appfit_core</h2>
+    <div class="ty" style="font-size:10px;color:#60a5fa;font-weight:600;margin-top:3px;">[Software System: 공유 Flutter 패키지 · Dart]</div>
+    <div class="de" style="font-size:11px;color:#94a3b8;margin-top:7px;line-height:1.5;">인증·소켓·이벤트·캐시·모니터링·OTA 공통 인프라. 배포 앱이 아니라 소비자 앱 안에 링크되는 라이브러리.</div>
+    <div class="drill">&#9654; 클릭하여 내부 모듈 보기 (L2)</div>
+  </div>
+
+  <!-- 소비자 앱 = 이 라이브러리의 "사용자" (좌측 3) -->
+  <div class="node actor" id="n-agent" style="left:13%;top:22%;">
+    <h3>AppFit Order Agent</h3><div class="ty">[Consumer App · path 의존]</div><div class="de">키오스크 주문 접수/KDS</div>
+  </div>
+  <div class="node actor" id="n-did" style="left:10%;top:43%;">
+    <h3>DID</h3><div class="ty">[Consumer App · git ref 의존]</div><div class="de">주문번호 디스플레이</div>
+  </div>
+  <div class="node actor" id="n-kiosk" style="left:13%;top:64%;">
+    <h3>Kiosk 외</h3><div class="ty">[Consumer App]</div><div class="de">기타 매장 운영 앱</div>
+  </div>
+
+  <!-- External Systems (우측 4) -->
+  <div class="node external" id="n-coreapi" style="left:71%;top:19%;">
+    <h3>AppFit Core REST API</h3><div class="ty">[External System]</div><div class="de">core-api · core-jpapi.waldplatform.com (환경별)<br>HTTPS · AES-GCM · HMAC-SHA512 서명</div>
+  </div>
+  <div class="node external" id="n-notifier" style="left:76%;top:37%;">
+    <h3>AppFit Notifier</h3><div class="ty">[External · WebSocket]</div><div class="de">notifier-api · notifier-jpapi.waldplatform.com<br>실시간 주문/기기명령 이벤트</div>
+  </div>
+  <div class="node external" id="n-sentry" style="left:73%;top:55%;">
+    <h3>Sentry</h3><div class="ty">[External System]</div><div class="de">크래시·에러·소켓 상태 breadcrumb</div>
+  </div>
+  <div class="node external" id="n-ota" style="left:68%;top:72%;">
+    <h3>OTA / APK Host</h3><div class="ty">[External · HTTP]</div><div class="de">버전 JSON + APK (다운로드 URL은 소비자 앱이 주입)</div>
+  </div>
+
+  <!-- Data Store (하단 중앙) -->
+  <div class="node datastore" id="n-storage" style="left:38%;top:86%;">
+    <h3>FlutterSecureStorage</h3><div class="ty">[Data Store · Keychain / Keystore]</div><div class="de">JWT·비밀번호·projectId·apiKey</div>
+  </div>
+
+  <!-- edge labels -->
+  <div class="edge-label la-actor" id="el-agent">import · path 의존</div>
+  <div class="edge-label la-actor" id="el-did">import · git ref 의존</div>
+  <div class="edge-label la-actor" id="el-kiosk">import</div>
+  <div class="edge-label la-ext" id="el-coreapi">HTTPS REST · AES-GCM · 토큰 헤더</div>
+  <div class="edge-label la-ext" id="el-notifier">WSS 이벤트 · 암호화 apiKey</div>
+  <div class="edge-label la-ext" id="el-sentry">에러·breadcrumb 전송</div>
+  <div class="edge-label la-ext" id="el-ota">버전 JSON·APK 조회</div>
+  <div class="edge-label la-data" id="el-storage">토큰·자격증명 R/W</div>
+</div>
+
+<!-- 범례 -->
+<div class="legend">
+  <div class="leg"><b class="lb-c"></b>공유 패키지</div>
+  <div class="leg"><b class="lb-a"></b>소비자 앱 (사용자)</div>
+  <div class="leg"><b class="lb-e"></b>외부 시스템</div>
+  <div class="leg"><b class="lb-d"></b>보안 저장소</div>
+</div>
+
+<!-- 성격 주석 -->
+<div class="legend" style="left:auto;right:18px;bottom:150px;max-width:280px;display:block;">
+  <div style="font-size:10.5px;color:#93c5fd;font-weight:700;margin-bottom:5px;">이 시스템의 성격</div>
+  <div style="font-size:10px;color:#94a3b8;line-height:1.55;">배포되는 앱이 아니라 <b style="color:#cbd5e1;">소비자 앱에 링크되는 라이브러리</b>다. 따라서 사람 대신 <b style="color:#6ee7b7;">앱</b>이 사용자이고, UI·프린터 같은 <b style="color:#cbd5e1;">하드웨어 노드는 없다</b>(소비자 앱의 몫).</div>
+</div>
+
+<!-- 줌 인디케이터 -->
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <span class="on" title="L1 System Context">L1</span>
+  <a class="off" href="c4core-l2.html" title="L2 Container">L2</a>
+  <span class="off" title="L3 Component">L3</span>
+  <span class="off" title="L4 Code">L4</span>
+</div>
+
+<!-- 우측 별첨 도크 (views/ — 동결) -->
+<nav class="dock">
+  <div class="dock-title">상세 뷰 <span class="frozen">별첨 · 동결</span></div>
+  <a class="vbtn vb-pay" href="views/c4-auth-token-flow.html">
+    <div class="vrow"><span class="vn">01</span><span class="vl">인증 토큰 흐름</span><span class="go">&rarr;</span></div>
+    <div class="vd">3단계 획득 &middot; 동시-401 직렬화 재발급</div>
+  </a>
+  <a class="vbtn vb-prd" href="views/c4-socket-lifecycle.html">
+    <div class="vrow"><span class="vn">02</span><span class="vl">소켓 생명주기</span><span class="go">&rarr;</span></div>
+    <div class="vd">backoff &middot; heartbeat &middot; 네트워크 복원</div>
+  </a>
+  <a class="vbtn vb-ui" href="views/c4-event-dispatch.html">
+    <div class="vrow"><span class="vn">03</span><span class="vl">이벤트 분류</span><span class="go">&rarr;</span></div>
+    <div class="vd">raw 메시지 &rarr; SocketDispatchOutcome 5종</div>
+  </a>
+</nav>
+
+<script src="c4core.js"></script>
+<script>
+c4Graph([
+  {from:'n-agent',    to:'n-core',     type:'actor', label:'el-agent',    dash:false},
+  {from:'n-did',      to:'n-core',     type:'actor', label:'el-did',      dash:false},
+  {from:'n-kiosk',    to:'n-core',     type:'actor', label:'el-kiosk',    dash:false},
+  {from:'n-core',     to:'n-coreapi',  type:'ext',   label:'el-coreapi',  dash:false},
+  {from:'n-notifier', to:'n-core',     type:'ext',   label:'el-notifier', dash:true},
+  {from:'n-core',     to:'n-sentry',   type:'ext',   label:'el-sentry',   dash:false},
+  {from:'n-core',     to:'n-ota',      type:'ext',   label:'el-ota',      dash:false},
+  {from:'n-core',     to:'n-storage',  type:'data',  label:'el-storage',  dash:false},
+]);
+
+// 중앙 노드 클릭 → L2 (드래그와 구분)
+(function(){
+  const c = document.getElementById('n-core');
+  let px, py;
+  c.addEventListener('mousedown', e => { px = e.clientX; py = e.clientY; });
+  c.addEventListener('mouseup', e => { if (Math.abs(e.clientX-px) < 5 && Math.abs(e.clientY-py) < 5) location.href = 'c4core-l2.html'; });
+})();
+</script>
+</body>
+</html>

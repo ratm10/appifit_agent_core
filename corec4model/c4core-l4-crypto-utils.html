@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — CryptoUtils</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#8b5cf6;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#3b82f6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.swap{position:fixed;top:60px;right:18px;z-index:30;font-size:12px;color:#93c5fd;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.swap:hover{background:rgba(59,130,246,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — CryptoUtils</h1>
+  <div class="sub mono">lib/src/auth/crypto_utils.dart</div>
+</div>
+<a class="back" href="c4core-l3-auth-crypto.html">&larr; L3 Components</a>
+<a class="swap" href="c4core-l4-token-manager.html">TokenManager &rarr;</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-auth-crypto.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">Waldlust Platform V2 암호화 원시 함수 모음(전부 <b>정적 메서드</b>, 상태 없음). WSS apiKey 암호화(<b>AES-256-GCM</b>)와 API Key 검증 서명(<b>HMAC-SHA512</b>)에 쓰인다. 키 길이 검증은 <b>비엄격</b> — 32바이트 미달 시 0패딩·초과 시 절삭으로 동작을 이어가되 디버그 빌드에서 경고한다.</div>
+
+  <div class="sec"><span class="sd" style="background:#8b5cf6;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">static only · 인스턴스 없음</div>
+      <div class="class-name">CryptoUtils</div>
+      <div class="class-layer">AES-256-GCM · HMAC-SHA512 · compact JSON</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#c4b5fd;"></span>의존</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">encrypt</span><span class="dep-ds">AES(GCM) Encrypter</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">crypto</span><span class="dep-ds">Hmac(sha512)</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">dart:math Random.secure</span><span class="dep-ds">IV 12바이트 생성</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#c4b5fd;"></span>주요 메서드 <span style="font-size:10.5px;color:#475569;font-weight:500;">(R 순수함수)</span></div>
+    <div class="methods">
+
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">encryptAesGcm()</span><span class="m-sig">(plainText, aesKeyString) → String</span><span class="m-tag">WSS apiKey</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">_prepareKey (32B)</span><span class="md-arr">→</span>
+            <span class="md-step">_generateIV (12B)</span><span class="md-arr">→</span>
+            <span class="md-step hot">AES-256-GCM 암호화</span><span class="md-arr">→</span>
+            <span class="md-step">IV+Cipher+AuthTag 결합</span><span class="md-arr">→</span>
+            <span class="md-step">Base64</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">출력</div><div class="md-v"><code>Base64( IV + EncryptedData + AuthTag )</code>. NotifierService가 이 결과를 <code>Authorization: Bearer</code>로 소켓 헤더에 실음</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">decryptAesGcm()</span><span class="m-sig">(encryptedText, aesKeyString) → String</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-v">Base64 디코드 &rarr; 앞 12바이트 IV 분리 &rarr; 나머지 복호화. 실패 시 <code>Exception('AES-GCM 복호화 실패')</code></div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">generateHmacSha512Signature()</span><span class="m-sig">(secret, payload) → String</span><span class="m-tag">API Key 검증</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v">UTF-8 인코딩 &rarr; <code>Hmac(sha512, secretBytes).convert(payload)</code> &rarr; Base64. TokenManager.validateApiKey의 <code>Waldlust-Signature</code> 생성</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">isValidAesKey() · createCompactJson()</span><span class="m-sig">보조</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">isValidAesKey</div><div class="md-v"><code>utf8.encode(key).length == 32</code> — 소비자가 서버 수신 aesKey를 <b>통신 전 사전 검증</b></div></div>
+          <div class="md-row"><div class="md-l">createCompactJson</div><div class="md-v"><code>jsonEncode</code> — 공백 없는 서명 페이로드</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-p">P</div>
+        <div class="m-head"><span class="m-name">_prepareKey()</span><span class="m-sig">(keyString) → Uint8List(32)</span><span class="m-tag">⚠ 비엄격</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">보정</div><div class="md-v">32B 일치면 그대로. <b>초과 시 절삭 / 미달 시 0바이트 패딩</b>(엔트로피 손실). <code>kDebugMode</code>에서만 경고 로그. 운영 실측 키 길이 확인 후 엄격 검증 전환 예정</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#f59e0b;"></span>상수 · 알려진 한계</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#fbbf24;background:rgba(245,158,11,.1);">상수</div>
+      <div class="entity-name">보안 파라미터</div>
+      <div class="entity-tag">AES-256-GCM · IV 96-bit</div>
+    </div>
+    <div class="fields">
+      <div class="field"><span class="f-col">aesKeyBytes</span><span class="f-type">32</span><span class="f-desc">AES-256 요구 키 길이</span></div>
+      <div class="field"><span class="f-col">IV length</span><span class="f-type">12 bytes</span><span class="f-desc">GCM 표준 nonce · Random.secure</span></div>
+      <div class="field"><span class="f-col">키 검증</span><span class="f-type">비엄격</span><span class="f-desc">패딩/절삭으로 동작 이어감 — 사전 isValidAesKey 권장</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,84 @@
+/* ============================================================
+   c4.css — 키오스크 C4 다이어그램 공통 디자인 시스템
+   헤더 / 4-탭 네비 / 배경 / 폰트 / 모션 토큰
+   페이지별 고유 스타일(노드그래프·타임라인·파이프라인)은 각 HTML에 둔다.
+   ============================================================ */
+
+:root{
+  --bg:#06080d;
+  --fg:#e2e8f0;
+  --muted:#94a3b8;
+  --dim:#64748b;
+  --line:rgba(255,255,255,.06);
+  /* 페이지가 override 하는 accent (기본 파랑) */
+  --accent:#60a5fa;
+  --accent-bg:rgba(59,130,246,.15);
+  --accent-br:rgba(59,130,246,.35);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--fg);min-height:100vh;
+  -webkit-overflow-scrolling:touch;
+}
+code,.mono{font-family:'JetBrains Mono','Fira Code',monospace;}
+
+/* ---- 배경 ---- */
+.ambient{position:fixed;border-radius:50%;filter:blur(120px);opacity:.07;pointer-events:none;z-index:0;}
+.bg-grid::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.03) 1px, transparent 0);
+  background-size:48px 48px;
+}
+
+/* ---- 공통 헤더 + 4탭 네비 (c4.js가 주입) ---- */
+.c4hdr{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:8px;
+  padding:0 16px;height:54px;
+  background:rgba(6,8,13,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--line);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;
+}
+.c4hdr .home{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);
+  text-decoration:none;padding:6px 11px;border:1px solid rgba(255,255,255,.1);border-radius:9px;
+  flex-shrink:0;transition:all .15s;
+}
+.c4hdr .home:hover{border-color:rgba(96,165,250,.4);color:#93c5fd;background:rgba(96,165,250,.06);}
+.c4hdr .brand{
+  font-size:10.5px;font-weight:800;letter-spacing:.09em;color:#475569;
+  text-transform:uppercase;padding:0 6px;flex-shrink:0;
+}
+.c4hdr .tabs{display:flex;gap:4px;flex-shrink:0;}
+.c4hdr .tab{
+  display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--muted);
+  text-decoration:none;padding:7px 13px;border-radius:9px;border:1px solid transparent;
+  transition:all .15s;
+}
+.c4hdr .tab:hover{background:rgba(255,255,255,.04);color:var(--fg);}
+.c4hdr .tab.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-br);}
+.c4hdr .tab .ti{opacity:.55;font-size:10.5px;font-weight:700;margin-right:6px;font-family:'JetBrains Mono',monospace;}
+
+/* ---- 공통 본문 셸 ---- */
+.c4main{position:relative;z-index:1;margin:0 auto;}
+.section-title{font-size:16px;font-weight:800;display:flex;align-items:center;gap:9px;}
+.section-title .st-dot{width:12px;height:12px;border-radius:4px;flex-shrink:0;}
+.section-sub{font-size:12.5px;color:var(--dim);line-height:1.6;}
+.section-sub code{color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;font-size:11.5px;}
+
+/* 페이지 제목 그라데이션 (accent 기반) */
+.grad-title{background:linear-gradient(90deg,#f1f5f9,var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+
+/* ---- 모션 토큰 ---- */
+@keyframes c4-cardIn{from{opacity:0;transform:translateY(11px);}to{opacity:1;transform:translateY(0);}}
+@keyframes c4-popIn{from{opacity:0;filter:blur(6px);}to{opacity:1;filter:blur(0);}}
+@keyframes c4-pulse{0%,100%{box-shadow:0 0 60px rgba(59,130,246,.12),0 0 120px rgba(59,130,246,.04);}50%{box-shadow:0 0 90px rgba(59,130,246,.26),0 0 150px rgba(59,130,246,.10);}}
+@keyframes c4-drift{0%,100%{transform:translate(0,0);}50%{transform:translate(28px,-22px);}}
+@keyframes c4-edgeFlow{to{stroke-dashoffset:-200;}}
+.ambient{animation:c4-drift 20s ease-in-out infinite;}
+
+@media(prefers-reduced-motion:reduce){
+  .ambient{animation:none;}
+  [class*="c4-anim"]{animation:none!important;opacity:1!important;}
+}

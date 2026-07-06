@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L4 — AppFitDioProvider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#3b82f6;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#8b5cf6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.swap{position:fixed;top:60px;right:18px;z-index:30;font-size:12px;color:#c4b5fd;text-decoration:none;padding:5px 12px;border:1px solid rgba(139,92,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.swap:hover{background:rgba(139,92,246,.1);}
+.dep-ds{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1;}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 4 — AppFitDioProvider</h1>
+  <div class="sub mono">lib/src/http/dio_provider.dart</div>
+</div>
+<a class="back" href="c4core-l3-http.html">&larr; L3 Components</a>
+<a class="swap" href="c4core-l4-token-manager.html">TokenManager &rarr;</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <a class="off" href="c4core-l3-http.html" title="L3">L3</a>
+  <span class="on" title="L4 Code">L4</span>
+</div>
+
+<div class="l4main">
+  <div class="l4lead">소비자 앱의 <b>모든 REST 호출이 통과하는 Dio 팩토리</b>. 두 인터셉터가 얹혀 요청마다 <b>토큰·Project-ID 헤더를 자동 주입</b>하고, 401이면 <b>토큰을 비우고 재발급 후 1회 재시도</b>하며, 서버 오류를 <b>읽기 좋은 예외로 래핑해 로깅</b>한다. 호출부에는 원본 <code>DioException</code>을 그대로 전파한다.</div>
+
+  <div class="sec"><span class="sd" style="background:#3b82f6;"></span>클래스 구조</div>
+  <div class="class-card">
+    <div class="class-head">
+      <div class="class-anno">생성자 주입: tokenManager(필수) · authProvider? · logger?</div>
+      <div class="class-name">AppFitDioProvider</div>
+      <div class="class-layer">late final Dio dio — baseUrl=AppFitConfig.baseUrl · 30s 타임아웃</div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#60a5fa;"></span>구성 인터셉터 (순서)</div>
+    <div class="deps">
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">_AppFitAuthInterceptor</span><span class="dep-ds">onRequest 헤더 주입 · onError 401 재발급</span></div>
+      <div class="dep"><span class="dep-ic dep-repo"></span><span class="dep-nm">_AppFitLogInterceptor</span><span class="dep-ds">요청/응답 로그 · 오류 ApiHttpException 래핑</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">AppFitTokenManager</span><span class="dep-ds">getValidToken · clearToken · loadPassword · getStoredProjectId</span></div>
+      <div class="dep"><span class="dep-ic dep-cross"></span><span class="dep-nm">AuthStateProvider?</span><span class="dep-ds">shopCode/password 최종 폴백</span></div>
+    </div>
+
+    <div class="subsec"><span class="sd2" style="background:#60a5fa;"></span>인터셉터 동작</div>
+    <div class="methods">
+
+      <div class="method open" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">_AppFitAuthInterceptor.onRequest()</span><span class="m-sig">헤더 자동 주입</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">스킵</div><div class="md-v"><code>/auth/</code> 포함 경로는 인증 불필요 &rarr; 통과</div></div>
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">shopCode 6단 폴백</span><span class="md-arr">→</span>
+            <span class="md-step">password (authProvider→SecureStorage)</span><span class="md-arr">→</span>
+            <span class="md-step hot">getValidToken → Bearer</span><span class="md-arr">→</span>
+            <span class="md-step">Waldlust-Project-ID 주입</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">shopCode 폴백</div><div class="md-v"><code>extra.shopCode</code> → <code>extra.storeId</code> → <code>X-Shop-Code</code> 헤더 → 쿼리 → body → <code>/v0/shop/{id}</code> 경로 → <code>authProvider.currentStoreId</code></div></div>
+          <div class="md-row"><div class="md-l">Project-ID</div><div class="md-v"><code>/v0/project/info</code>는 헤더 없이 호출. 그 외엔 저장 projectId(없으면 AppFitConfig.projectId) 주입</div></div>
+          <div class="md-row"><div class="md-l">실패</div><div class="md-v">예외 시 <code>handler.reject(DioException type:cancel)</code> — "토큰 발급 실패"</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-w">W</div>
+        <div class="m-head"><span class="m-name">_AppFitAuthInterceptor.onError()</span><span class="m-sig">401 → 재발급 재시도</span><span class="m-tag">1회 제한</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">가드</div><div class="md-v"><code>extra['_appfit_retried']==true</code>면 즉시 <code>next(err)</code> — 무한 루프 차단</div></div>
+          <div class="md-row"><div class="md-l">흐름</div><div class="md-flow">
+            <span class="md-step">clearToken</span><span class="md-arr">→</span>
+            <span class="md-step">shopCode·password 복원</span><span class="md-arr">→</span>
+            <span class="md-step hot">getValidToken (직렬화)</span><span class="md-arr">→</span>
+            <span class="md-step">_retried=true·Bearer·Project-ID 재주입</span><span class="md-arr">→</span>
+            <span class="md-step cross">dio.fetch(opts) → resolve</span>
+          </div></div>
+          <div class="md-row"><div class="md-l">중단</div><div class="md-v">password 없으면 재로그인 필요 &rarr; <code>next(err)</code>. TokenManager 직렬화 덕에 여러 401 동시 도착에도 실제 로그인 1회</div></div>
+        </div>
+      </div>
+
+      <div class="method" onclick="this.classList.toggle('open')">
+        <div class="m-badge mb-r">R</div>
+        <div class="m-head"><span class="m-name">_AppFitLogInterceptor.onError()</span><span class="m-sig">구조화 로깅</span></div>
+        <div class="m-detail">
+          <div class="md-row"><div class="md-l">동작</div><div class="md-v"><code>ApiHttpException.fromDio(err)</code>로 서버 code/message 추출 &rarr; <code>logger.error()</code>. <b>호출부에는 원본 err를 next로 전파</b>(타입 불변) — SentryAppFitLogger가 benign 코드는 breadcrumb, 나머지는 issue</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec"><span class="sd" style="background:#f87171;"></span>상수 · 계약</div>
+  <div class="entity-card">
+    <div class="entity-head">
+      <div class="class-anno" style="color:#fca5a5;background:rgba(248,113,113,.1);">불변 계약</div>
+      <div class="entity-name">전파 규칙 · 재시도</div>
+      <div class="entity-tag">소비자 e is DioException 분기 보존</div>
+    </div>
+    <div class="fields">
+      <div class="field"><span class="f-col">_kRetriedFlag</span><span class="f-type">'_appfit_retried'</span><span class="f-desc">요청당 401 재시도 1회 제한 키</span></div>
+      <div class="field"><span class="f-col">전파 타입</span><span class="f-type">DioException</span><span class="f-desc">ApiHttpException은 로깅 전용 — 호출부 계약 불변</span></div>
+      <div class="field"><span class="f-col">재시도 채널</span><span class="f-type">provider.dio.fetch</span><span class="f-desc">baseUrl·인터셉터 유지 재요청</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

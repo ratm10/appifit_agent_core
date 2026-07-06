@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 · L3 — Monitoring &amp; Logging Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="c4core.css">
+<style>
+.amb1{width:560px;height:560px;background:#ef4444;top:8%;left:22%;}
+.amb2{width:440px;height:440px;background:#3b82f6;bottom:8%;right:12%;}
+.back{position:fixed;top:60px;left:18px;z-index:30;font-size:12px;color:#60a5fa;text-decoration:none;padding:5px 12px;border:1px solid rgba(59,130,246,.3);border-radius:8px;background:rgba(6,8,13,.6);}
+.back:hover{background:rgba(59,130,246,.1);}
+.l3main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:78px 28px 90px;}
+.l3lead{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:8px;}
+.l3lead b{color:var(--muted);}
+.l3lead code{color:#fbbf24;background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px;font-size:11.5px;}
+.l3note{font-size:11.5px;color:#475569;margin-bottom:22px;}
+.l3note b{color:#93c5fd;}
+.layer{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:stretch;margin-bottom:14px;}
+.layer-label{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:12px 13px;border-radius:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);}
+.layer-label .ln{font-size:13px;font-weight:800;color:#e2e8f0;}
+.layer-label .lt{font-size:9.5px;font-weight:600;color:#64748b;}
+.layer-label .ld{width:9px;height:9px;border-radius:3px;margin-bottom:2px;}
+.comps{display:flex;gap:10px;flex-wrap:wrap;align-content:center;padding:5px 0;}
+.comp{flex:1;min-width:210px;background:rgba(10,18,35,.72);border:1.5px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 14px;transition:border-color .2s,transform .2s,box-shadow .2s;}
+.comp .cn{font-size:13.5px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.comp .cr{font-size:10.5px;color:#94a3b8;margin-top:3px;line-height:1.45;}
+.comp .cf{font-size:9.5px;color:#475569;margin-top:5px;font-family:'JetBrains Mono',monospace;}
+.comp.l4{cursor:pointer;}
+.comp.l4:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.35);}
+.l4go{display:inline-block;margin-top:6px;font-size:9.5px;font-weight:800;color:#06080d;background:#60a5fa;border-radius:6px;padding:1px 8px;}
+.t-ps{border-color:rgba(248,113,113,.3);} .t-ps .cn{color:#fca5a5;}
+.t-ifc{border-color:rgba(52,211,153,.3);} .t-ifc .cn{color:#6ee7b7;}
+.t-svc{border-color:rgba(245,158,11,.3);} .t-svc .cn{color:#fbbf24;}
+.t-gw{border-color:rgba(139,92,246,.35);} .t-gw .cn{color:#c4b5fd;}
+.consts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.kv{font-size:10px;font-family:'JetBrains Mono',monospace;color:#cbd5e1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:2px 8px;}
+.kv b{color:#67e8f9;font-weight:700;}
+@keyframes c4-cin{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.layer{opacity:0;animation:c4-cin .5s ease both;}
+.layer:nth-child(3){animation-delay:.06s;}.layer:nth-child(4){animation-delay:.12s;}
+@media(prefers-reduced-motion:reduce){.layer{animation:none;opacity:1;}}
+@media(max-width:760px){.l3main{padding:70px 12px 80px;}.layer{grid-template-columns:1fr;}.comp{min-width:100%;}}
+</style>
+</head>
+<body class="bg-grid">
+<div class="ambient amb1"></div><div class="ambient amb2"></div>
+<div class="ghdr">
+  <div class="badge">C4 Model</div>
+  <h1>Level 3 — Monitoring &amp; Logging Components</h1>
+  <div class="sub mono">lib/src/monitoring/ · lib/src/logging/</div>
+</div>
+<a class="back" href="c4core-l2.html">&larr; L2 Container</a>
+<div class="zoom">
+  <span class="zt">Zoom</span>
+  <a class="off" href="c4core-context.html" title="L1">L1</a>
+  <a class="off" href="c4core-l2.html" title="L2">L2</a>
+  <span class="on" title="L3 Component">L3</span>
+  <span class="off" title="L4 있음">L4</span>
+</div>
+
+<div class="l3main">
+  <div class="l3lead"><b>노이즈를 걸러 진짜 신호만 Sentry로 보낸다.</b> MonitoringService가 쿨다운·플래핑으로 중복을 억제하고, 로거 계층은 <b>데코레이터</b>로 얹혀 error()만 Sentry에 위임한다. 소비자 앱은 로거·컨텍스트를 <b>구현해 주입</b>한다.</div>
+  <div class="l3note"><b>계약</b> — <code>AppFitLogger</code>·<code>MonitoringContext</code>는 소비자 구현 추상 인터페이스(MAJOR bump 대상). MonitoringService 카드 클릭 시 L4.</div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#ef4444;"></div><div class="ln">모니터링</div><div class="lt">Sentry 싱글톤</div></div>
+    <div class="comps">
+      <div class="comp t-ps l4" data-href="c4core-l4-monitoring-service.html"><div class="cn">MonitoringService</div><div class="cr">Sentry 초기화(트레이싱·세션 트래킹 OFF)·소켓 상태 breadcrumb·예외 캡처. 60s 전환 쿨다운·5분 에러 쿨다운·플래핑 감지 후 2분 안정화. HTTP 오류는 status/code/path 태그 승격.</div><span class="l4go">&#9654; L4</span><div class="cf">monitoring_service.dart</div></div>
+      <div class="comp t-ifc"><div class="cn">MonitoringContext</div><div class="cr">추상 인터페이스 8필드 — storeId·storeName·appType·appVersion·buildNumber·deviceModel·deviceManufacturer·environment. Sentry user/tag/context에 매핑.</div><div class="cf">monitoring_context.dart</div></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label"><div class="ld" style="background:#8b5cf6;"></div><div class="ln">로깅</div><div class="lt">인터페이스 · 데코레이터</div></div>
+    <div class="comps">
+      <div class="comp t-ifc"><div class="cn">AppFitLogger</div><div class="cr">추상 — <code>log</code>/<code>error</code> 2메서드만 구현. <code>AppFitLoggerLevels</code> 확장이 debug/info/warn 자동 제공(모두 log 위임·프리픽스). v1.0.6+ 위치.</div><div class="cf">appfit_logger.dart</div></div>
+      <div class="comp t-svc"><div class="cn">DefaultAppFitLogger</div><div class="cr">기본 구현 — <code>kDebugMode</code> 가드 콘솔 출력. 프로덕션은 전용 로거 주입.</div><div class="cf">appfit_logger.dart</div></div>
+      <div class="comp t-gw"><div class="cn">SentryAppFitLogger</div><div class="cr">데코레이터 — delegate 로거를 감싸 error()만 Sentry로. <code>ApiHttpException</code>의 benign 코드(<code>INVALID_ORDER_STATUS</code>)는 issue 대신 breadcrumb으로만.</div><div class="cf">sentry_appfit_logger.dart</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.comp.l4').forEach(n=>{
+  n.addEventListener('click',()=>{const h=n.getAttribute('data-href');if(h)location.href=h;});
+});
+</script>
+</body>
+</html>

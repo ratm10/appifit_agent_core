@@ -42,3 +42,5 @@
 - Flutter/Dart 코드 스타일·null safety·Riverpod·테스트·문서화 규약: [docs/FLUTTER_GUIDELINES.md](docs/FLUTTER_GUIDELINES.md)
 - 외부 사용자(소비자 앱) 시점 가이드: [appfit_core/README.md](appfit_core/README.md)
 - 변경 이력: [appfit_core/CHANGELOG.md](appfit_core/CHANGELOG.md)
+- As-Is 아키텍처 요약(Outline 게시용·라이브러리 판형 표 중심): [docs/AS-IS.md](docs/AS-IS.md)
+- C4 시각 모델(L1~L4 + views 3종, 진입점 `corec4model/c4core-context.html` — 아키텍처 변경 시 함께 갱신, 검증은 `corec4model/verify_c4.py`. 규약 정본은 appfit_order_agent `docs/C4_GUIDE.md`): [corec4model/](corec4model/)
