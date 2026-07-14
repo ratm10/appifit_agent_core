@@ -13,7 +13,10 @@ pubspec.lock
 build/
 
 # Claude
-.claude/
+# 메모리(.claude/memory/)만 추적 — 맥/PC 간 공유. 나머지 로컬 설정은 제외.
+.claude/*
+!.claude/memory/
+!.claude/MEMORY_SETUP.md
 
 # 환경 변수/시크릿
 .env

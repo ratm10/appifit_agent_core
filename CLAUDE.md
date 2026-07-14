@@ -44,3 +44,4 @@
 - 변경 이력: [appfit_core/CHANGELOG.md](appfit_core/CHANGELOG.md)
 - As-Is 아키텍처 요약(Outline 게시용·라이브러리 판형 표 중심): [docs/AS-IS.md](docs/AS-IS.md)
 - C4 시각 모델(L1~L4 + views 3종, 진입점 `corec4model/c4core-context.html` — 아키텍처 변경 시 함께 갱신, 검증은 `corec4model/verify_c4.py`. 규약 정본은 appfit_order_agent `docs/C4_GUIDE.md`): [corec4model/](corec4model/)
+- Claude 메모리 공유(메모리 정본은 `.claude/memory/`, 머신별 홈 경로에서 심볼릭 링크 — 새 머신 최초 1회 셋업): [.claude/MEMORY_SETUP.md](.claude/MEMORY_SETUP.md)
