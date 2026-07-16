@@ -3,7 +3,37 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.14 (현재) — 쿠폰 사용 엔드포인트 use-without-item 전환
+## v1.0.16 (현재) — Sentry 노이즈 정리(일시적 네트워크 오류) + 매장명 태그
+
+### Added
+- `ApiHttpException.isTransientNetworkError` getter — HTTP 상태코드가 없고
+  (`status == null`) Dio 예외 타입이 전송계층 실패(connectionTimeout·sendTimeout·
+  receiveTimeout·connectionError·cancel)인 "일시적 네트워크" 오류 판정.
+  `DioExceptionType.unknown`·`badCertificate` 는 의도적으로 제외(진짜 결함이
+  섞일 수 있어 가시성 유지). 토글 지점은 `_transientDioTypes` 한 곳.
+- `MonitoringService`: Sentry scope 에 `store_name` 태그 추가
+  (`_applyScope`·`updateStoreInfo` 양쪽). Slack 알림 등에서 **매장명을 바로
+  표시**하기 위함 — `user.username`/`store_info` 컨텍스트는 태그가 아니라 알림
+  tags 블록에 노출되지 않는다. 매장코드는 기존 `store_id` 태그로 이미 노출.
+
+### Changed
+- `SentryAppFitLogger.error`: 일시적 네트워크 오류(HTTP ?)를 Sentry **issue 로
+  올리지 않고 breadcrumb(warning)로만** 남긴다. 기기 순단·재연결 중 발생하는
+  환경성 오류의 이슈 노이즈를 제거한다. 지속적 장애는 `MonitoringService` 의
+  연결 상태 flapping 감지가 별도로 포착한다.
+
+  **소비자 영향 (behavior change)**: 두 앱(appfit_order_agent·did) 모두 순단성
+  `ApiHttpException: HTTP ? ...` 오류가 Sentry 이슈로 집계되지 않는다(breadcrumb
+  로만 흐름에 기록). 서버 응답이 있는 오류(4xx/5xx)와 지속 장애는 그대로 이슈로
+  올라간다. Slack 알림에는 `store_id`(매장코드) + `store_name`(매장명)이 태그로
+  표시된다(소비자 앱 재배포 후 신규 이벤트부터).
+
+## v1.0.15 — 운영 로그 1줄화 + 스타일 현대화
+
+### Changed
+- 운영 로그 메시지 1줄화 및 코드 스타일 현대화. 동작 변경 없음(로그 출력 포맷만).
+
+## v1.0.14 — 쿠폰 사용 엔드포인트 use-without-item 전환
 
 ### Changed
 - `ApiRoutes.couponUse(couponNo)`: 반환 경로를 `/v0/coupon/{couponNo}/use` →

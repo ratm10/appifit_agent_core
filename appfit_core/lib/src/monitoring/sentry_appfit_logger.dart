@@ -49,6 +49,19 @@ class SentryAppFitLogger implements AppFitLogger {
         return;
       }
 
+      // 서버 응답 없는 일시적 네트워크 오류(HTTP ?) → breadcrumb(warning)만.
+      // 기기 순단·재연결 중 발생하는 환경성 오류이며 코드 결함이 아니므로
+      // issue 로 올리지 않는다. 지속적 장애는 연결 상태 flapping 감지가 포착.
+      if (error.isTransientNetworkError) {
+        Sentry.addBreadcrumb(Breadcrumb(
+          message: error.toString(),
+          category: 'http',
+          level: SentryLevel.warning,
+          data: extras,
+        ));
+        return;
+      }
+
       MonitoringService.instance.captureError(
         error,
         error.cause.stackTrace,

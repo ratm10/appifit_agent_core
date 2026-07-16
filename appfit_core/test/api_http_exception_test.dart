@@ -9,6 +9,7 @@ DioException _dioError({
   int? status = 400,
   Object? data,
   Map<String, List<String>>? headers,
+  DioExceptionType? type,
 }) {
   final options = RequestOptions(path: path, method: method);
   final response = status == null
@@ -22,9 +23,10 @@ DioException _dioError({
   return DioException(
     requestOptions: options,
     response: response,
-    type: status == null
-        ? DioExceptionType.connectionError
-        : DioExceptionType.badResponse,
+    type: type ??
+        (status == null
+            ? DioExceptionType.connectionError
+            : DioExceptionType.badResponse),
   );
 }
 
@@ -177,6 +179,43 @@ void main() {
         _dioError(status: null, method: 'GET', path: '/v0/shop/info'),
       );
       expect(noResponse.fingerprint, ['http', 'GET', '/v0/shop/info', '?']);
+    });
+  });
+
+  group('ApiHttpException.isTransientNetworkError', () {
+    test('상태 없는 연결/타임아웃/취소 계열은 일시적 네트워크 오류로 판정', () {
+      for (final type in [
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.sendTimeout,
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.connectionError,
+        DioExceptionType.cancel,
+      ]) {
+        final exception = ApiHttpException.fromDio(
+          _dioError(
+              status: null, method: 'GET', path: '/v0/shop/info', type: type),
+        );
+        expect(exception.isTransientNetworkError, isTrue, reason: '$type');
+      }
+    });
+
+    test('HTTP 상태가 있으면(badResponse) 일시적 네트워크 오류가 아니다', () {
+      final exception = ApiHttpException.fromDio(_dioError(status: 504));
+      expect(exception.isTransientNetworkError, isFalse);
+    });
+
+    test('unknown 타입은 의도적으로 제외한다(가시성 유지)', () {
+      final exception = ApiHttpException.fromDio(
+        _dioError(status: null, type: DioExceptionType.unknown),
+      );
+      expect(exception.isTransientNetworkError, isFalse);
+    });
+
+    test('badCertificate 는 실제 구성 오류이므로 제외한다', () {
+      final exception = ApiHttpException.fromDio(
+        _dioError(status: null, type: DioExceptionType.badCertificate),
+      );
+      expect(exception.isTransientNetworkError, isFalse);
     });
   });
 

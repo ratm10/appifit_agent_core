@@ -80,6 +80,29 @@ class ApiHttpException implements Exception {
         if (requestId != null) 'request_id': requestId,
       };
 
+  /// 서버 응답 없이 전송 계층에서 실패한 "일시적 네트워크" 오류인지.
+  ///
+  /// 기기 순단·재연결 중 발생하는 환경성 오류로, HTTP 상태코드가 없고
+  /// (`status == null`) Dio 예외 타입이 연결/타임아웃/취소 계열이다.
+  /// Sentry issue 로 올리지 않고 breadcrumb 으로만 남기는 판정에 쓰인다
+  /// ([SentryAppFitLogger.error] 참고). 지속적 장애는 별도로
+  /// `MonitoringService` 의 연결 상태 flapping 감지가 포착한다.
+  ///
+  /// `DioExceptionType.unknown` 은 의도적으로 제외한다 — 미분류 오류에
+  /// 진짜 결함이 섞여 들어올 수 있어 issue 로 남겨 가시성을 유지한다.
+  /// 새 타입 토글은 [_transientDioTypes] 한 곳만 수정한다.
+  bool get isTransientNetworkError =>
+      status == null && _transientDioTypes.contains(cause.type);
+
+  /// 서버 응답 없는 전송 계층 실패로 간주할 Dio 예외 타입.
+  static const Set<DioExceptionType> _transientDioTypes = {
+    DioExceptionType.connectionTimeout,
+    DioExceptionType.sendTimeout,
+    DioExceptionType.receiveTimeout,
+    DioExceptionType.connectionError,
+    DioExceptionType.cancel,
+  };
+
   /// Sentry 그룹핑 fingerprint — 메서드+경로+상태+서버코드 단위로 묶는다.
   List<String> get fingerprint => <String>[
         'http',

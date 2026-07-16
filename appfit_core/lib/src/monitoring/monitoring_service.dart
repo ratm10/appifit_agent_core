@@ -98,6 +98,8 @@ class MonitoringService {
     Sentry.configureScope((scope) {
       scope.setUser(SentryUser(id: storeId, username: storeName));
       scope.setTag('store_id', storeId);
+      // store_name 태그: Slack 알림에서 매장명을 바로 표시 (컨텍스트/user 는 태그 아님).
+      scope.setTag('store_name', storeName);
       scope.setContexts('store_info', {
         'store_id': storeId,
         'store_name': storeName,
@@ -281,6 +283,9 @@ class MonitoringService {
       scope.setTag('app_type', ctx.appType);
       scope.setTag('environment', ctx.environment);
       if (ctx.storeId.isNotEmpty) scope.setTag('store_id', ctx.storeId);
+      // store_name 태그: Slack 알림 등에서 매장명을 바로 표시하기 위함
+      // (user.username/store_info 컨텍스트는 태그가 아니라 알림에 노출 안 됨).
+      if (ctx.storeName.isNotEmpty) scope.setTag('store_name', ctx.storeName);
       if (ctx.deviceManufacturer.isNotEmpty) {
         scope.setTag('device_manufacturer', ctx.deviceManufacturer);
       }
