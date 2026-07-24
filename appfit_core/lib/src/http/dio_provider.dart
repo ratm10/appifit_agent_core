@@ -186,6 +186,7 @@ class _AppFitAuthInterceptor extends Interceptor {
   }
 
   bool _isProjectInfoEndpoint(String path) {
+    // project/info 는 항상 /v0 고정이라 리터럴 매칭한다.
     return path.contains('/v0/project/info');
   }
 

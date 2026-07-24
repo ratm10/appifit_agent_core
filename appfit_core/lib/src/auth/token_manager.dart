@@ -212,6 +212,7 @@ class AppFitTokenManager {
       await _logger.log('- Endpoint: /v0/auth/sign-in');
 
       // API 요청 (Method 2: /v0/auth/sign-in)
+      // 인증은 버전 무관하게 항상 /v0 고정(백엔드가 인증을 버전 분리하지 않음).
       final response = await dio.post(
         '/v0/auth/sign-in',
         data: requestBody,
@@ -367,7 +368,7 @@ class AppFitTokenManager {
 
       await _logger.log('[Token] API Key 검증 요청 시작');
 
-      // 4. API 요청
+      // 4. API 요청 (인증은 버전 무관하게 항상 /v0 고정)
       final response = await dio.post(
         '/v0/auth/api-key/validate',
         data: requestBody,

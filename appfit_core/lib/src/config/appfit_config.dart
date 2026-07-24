@@ -8,6 +8,12 @@ class AppFitConfig {
   /// API 환경 (기본값: live)
   static AppFitEnvironment _environment = AppFitEnvironment.live;
 
+  /// API 버전 프리픽스 (기본값: '/v0' — 현행 동작 보존).
+  /// 서버(환경)와 독립 축이라 configure() 와 분리해 관리한다:
+  /// 서버 전환이 버전을 덮지 않고, 버전 전환이 서버를 덮지 않는다.
+  /// 일부 브랜드는 백엔드에서 '/v1' 로 태워야 하므로 런타임 선택 가능해야 한다.
+  static String _apiVersion = '/v0';
+
   /// Project ID
   static String? _projectId;
 
@@ -27,6 +33,12 @@ class AppFitConfig {
 
   /// 현재 환경
   static AppFitEnvironment get environment => _environment;
+
+  /// 현재 API 버전 프리픽스 ('/v0' | '/v1'). ApiRoutes 및 인증 엔드포인트가 참조.
+  static String get apiVersion => _apiVersion;
+
+  /// API 버전 프리픽스 설정 (예: '/v0', '/v1'). 로그인 화면 토글에서 호출.
+  static void setApiVersion(String version) => _apiVersion = version;
 
   /// 현재 환경의 Base URL
   static String get baseUrl => _environment.baseUrl;
@@ -52,6 +64,7 @@ class AppFitConfig {
 AppFit API 설정:
 - AppFit Core v$packageVersion
 - 환경: ${_environment.name}
+- API Version: $_apiVersion
 - Base URL: $baseUrl
 - WebSocket URL: $websocketUrl
 - Project ID: ${_mask(_projectId)}
