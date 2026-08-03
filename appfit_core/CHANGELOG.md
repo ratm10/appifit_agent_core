@@ -3,7 +3,28 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.16 (현재) — Sentry 노이즈 정리(일시적 네트워크 오류) + 매장명 태그
+## v1.0.18 (현재) — 기기 관제(Fleet) 승격
+
+### Added
+- `src/fleet/` 신설 — 기기 실행상태·기기정보 보고 + 원격 명령(로그 업로드 등)을
+  다루는 공통 리포터. `appfit_order_agent`의 `feat/fleet-monitoring`에서 실기기
+  파일럿 전 단계까지 앱 안에서 먼저 구현·검증(fakeAsync 21케이스 + 실서버 왕복
+  테스트)한 뒤 그대로 옮긴 것 — 로직 변경 없이 import 경로만 `package:appfit_core/...`
+  로 치환됨.
+  - `FleetModels`(`FleetDeviceInfo`/`FleetRuntime`/`FleetSnapshot`/`FleetCommand`/
+    `FleetAck` 등) — 서버(Cloudflare Worker register/heartbeat) 와이어 계약.
+  - `FleetSink`(추상) + `NoopFleetSink` — 전송 목적지 추상화, 미설정 빌드에서
+    무해한 기본값.
+  - `HttpFleetSink` — 전용 Dio로 관제 서버에 register/heartbeat 전송. **의도적으로
+    `appFitDioProvider`를 재사용하지 않는다** — 그 인스턴스는 매장 인증 헤더를
+    자동 주입해서, 재사용하면 매장 자격증명이 관제 서버로 흘러간다.
+  - `FleetReporter` — 시계를 읽지 않는 순수 Timer 기반 폴링/백오프/명령 디스패치.
+    `FleetCommand.type`은 의도적으로 `String`(enum 아님) — 새 명령 타입 추가마다
+    core 재릴리즈를 강제하지 않기 위함.
+  - `deviceId` 조달·저장은 이 모듈의 책임이 **아니다** — 소비 앱이 콜백으로
+    주입한다(order_agent 정본은 `DeviceIdentityService`).
+
+## v1.0.16 — Sentry 노이즈 정리(일시적 네트워크 오류) + 매장명 태그
 
 ### Added
 - `ApiHttpException.isTransientNetworkError` getter — HTTP 상태코드가 없고

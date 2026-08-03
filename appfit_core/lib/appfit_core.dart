@@ -51,3 +51,9 @@ export 'src/ota/ota_update_manager.dart';
 export 'src/monitoring/monitoring_context.dart';
 export 'src/monitoring/monitoring_service.dart';
 export 'src/monitoring/sentry_appfit_logger.dart';
+
+// Fleet (기기 관제 — 실행상태/기기정보 보고 + 원격 명령)
+export 'src/fleet/fleet_models.dart';
+export 'src/fleet/fleet_sink.dart';
+export 'src/fleet/http_fleet_sink.dart';
+export 'src/fleet/fleet_reporter.dart';
