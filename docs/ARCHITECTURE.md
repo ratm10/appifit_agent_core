@@ -19,6 +19,8 @@ appfit_core/lib/
     │   ├── appfit_config.dart    # AppFitConfig — 환경별 URL 결정 (dev/staging/live/japanLive)
     │   ├── appfit_timeouts.dart  # HTTP/WebSocket/OTA 타임아웃 상수
     │   └── sync_intervals.dart   # AppFitSyncIntervals 폴링 간격 상수
+    ├── device/                   # 기계적 기기·앱 정보 수집 (v1.1.0+, Fleet/Monitoring 공유)
+    │   └── device_probe.dart     # AppFitDeviceProbe(추상) / PlatformDeviceProbe
     ├── events/                   # 소켓 이벤트
     │   ├── order_event_types.dart        # OrderEventType enum
     │   ├── socket_event_payload.dart     # SocketEventPayload 파싱
@@ -36,6 +38,17 @@ appfit_core/lib/
     ├── ota/                      # OTA 업데이트
     │   ├── ota_models.dart       # OTA 상태/이벤트 모델
     │   └── ota_update_manager.dart   # APK 다운로드/설치 관리
+    ├── fleet/                    # 기기 관제 (v1.0.18+, 파사드는 v1.1.0+)
+    │   ├── fleet_models.dart     # 와이어 모델 (FleetDeviceInfo/FleetRuntime/FleetSnapshot/FleetCommand/FleetAck 등)
+    │   ├── fleet_sink.dart       # FleetSink 추상 + NoopFleetSink
+    │   ├── http_fleet_sink.dart  # HttpFleetSink — 관제 서버 register/heartbeat 전송
+    │   ├── fleet_reporter.dart   # FleetReporter — 폴링/백오프/명령 디스패치 (시계 미사용, fakeAsync 검증)
+    │   ├── fleet_identity.dart   # FleetIdentityResolver(추상) + DefaultFleetIdentityResolver
+    │   ├── fleet_app_state.dart  # FleetAppState/FleetAppStateReader — 앱이 주는 유일한 동적 값
+    │   ├── fleet_snapshot_assembler.dart  # FleetSnapshotAssembler — 정적 정보 기계적 조립
+    │   ├── fleet_connection_status.dart   # FleetConnectionStatus enum
+    │   ├── observing_fleet_sink.dart      # ObservingFleetSink — 연결상태 관찰 데코레이터
+    │   └── fleet_kit.dart        # FleetKit — 채택 파사드(§ docs/FLEET_ADOPTION.md)
     ├── socket/                   # WebSocket 통신
     │   ├── notifier_service.dart # AppFitNotifierService — 연결/재연결/하트비트
     │   └── appfit_notifier_notifier.dart  # Riverpod Notifier 래퍼
@@ -58,6 +71,7 @@ appfit_core/lib/
 - **`BatchMergeBuffer`** — 시간 윈도우 동안 다수 이벤트 누적 후 단일 flush 콜백. 활성 타이머 있으면 추가 `schedule()` 호출 무시(첫 호출이 flush 시점 결정).
 - **`ProcessedOrderCache`** — raw 키 기반 dedup. 키 합성은 호출자 책임(예: `${orderId}_${status}`). 기본 30분 TTL / 500건 LRU.
 - **`RecentRemovalsCache`** — DONE/CANCELLED orderId TTL 캐시. 기본 120s. 폴링·초기로드 응답이 살아있는 상태로 돌려줘도 부활 필터링.
+- **`FleetKit`**(v1.1.0+) — 기기 관제 채택 파사드. 앱은 `appType` + `FleetAppStateReader` 만 주고, 정적 기기정보 수집·식별자 조달·연결성 판정·라이프사이클 관찰·sink 조립·연결상태 노출은 전부 이 클래스가 내부(`FleetSnapshotAssembler`/`DefaultFleetIdentityResolver`/`PlatformDeviceProbe`/`ObservingFleetSink`)에서 처리. `FleetReporter`(시계 미사용 순수 Timer 폴링/백오프/명령 디스패치)는 그대로 저수준 탈출구로 노출. 새 앱 채택 절차는 [`FLEET_ADOPTION.md`](FLEET_ADOPTION.md).
 
 ## 알려진 한계
 
