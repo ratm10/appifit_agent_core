@@ -3,7 +3,72 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.0.18 (현재) — 기기 관제(Fleet) 승격
+## v1.1.0 (현재) — Fleet 채택 파사드(`FleetKit`)
+
+세 번째 소비 앱(`did`)이 fleet 을 채택하며 드러난 문제: 앱당 채택 비용이
+스냅샷 빌더(~110줄)+riverpod 배선(~140줄)+식별자 서비스(~190줄)+연결상태
+데코레이터(~70줄)로 ~510줄이었다. 이번 릴리스는 그중 앱 고유가 아닌 부분을
+전부 core 로 옮겨 앱당 필수 코드를 ~40줄로 줄인다. **순수 가산(additive)
+릴리스** — 기존 `FleetReporter`/`FleetSink`/`HttpFleetSink`/`FleetModels` 공개
+API 는 한 글자도 바뀌지 않았고, `fleet_reporter_test.dart` 21케이스는 무수정
+통과한다.
+
+### Added
+- `src/device/device_probe.dart` — `AppFitDeviceProbe`(추상) + `PlatformDeviceProbe`
+  (device_info_plus + package_info_plus 조합, 1회 캐시). fleet 전용이 아니라
+  `src/device/` 에 둔 이유: 향후 `MonitoringContext` 구현체들의 중복도 이 probe
+  로 흡수할 수 있어서(별도 후속 작업, 인터페이스 자체는 통합하지 않음 — 부팅 시
+  1회 스냅샷 vs 60초 주기 live pull 로 시간 의미가 다름).
+- `src/fleet/fleet_identity.dart` — `FleetIdentity`/`FleetIdSources`/
+  `FleetIdentityResolver`(추상)/`FleetIdentityStore`(추상, 앱 저장소 seam)/
+  `PrefsFleetIdentityStore`/`DefaultFleetIdentityResolver`(시리얼 > Windows
+  MachineGuid > 설치 UUID, 시리얼 영속 캐시 필수). **"식별자는 소비 앱이
+  조달한다"는 기존 규율은 완화되지 않았다** — `identity:` 를 앱이 주입하면
+  core 기본 구현은 아예 생성되지 않는 **배타적 슬롯**이다. 앱 정본과 core
+  기본이 동시에 존재해 정본이 갈라지는 구조(계층형 폴백)는 만들지 않는다.
+- `src/fleet/fleet_app_state.dart` — `FleetAppState`/`FleetAppStateReader`.
+  앱이 매 heartbeat 틱마다 돌려주는 유일한 것(storeId/storeName/mode/
+  businessOpen/extra). **동기**여야 한다 — I/O 는 이 클로저 밖에서.
+- `src/fleet/fleet_snapshot_assembler.dart` — `FleetSnapshotAssembler`.
+  order_agent 의 스냅샷 빌더(110줄)를 범용화해 승격. 정적 기기정보·식별자·
+  연결성은 기계적으로 조립하고 앱은 `FleetAppStateReader` 하나만 준다.
+- `src/fleet/fleet_kit.dart` — `FleetKit` 파사드. 위 전부(식별자·probe·
+  연결성·라이프사이클 관찰·sink 조립·연결상태 노출)를 캡슐화하고, 앱은
+  `appType` + `readAppState` 만 준다. riverpod provider 는 core 가 만들지
+  않는다(2.5/3.0 동시 지원 제약 때문 — 앱이 `Provider` 1~2개로 감싼다).
+- `src/fleet/fleet_connection_status.dart`, `src/fleet/observing_fleet_sink.dart`
+  — order_agent 전용이던 두 파일(총 72줄)을 두 번째 앱 등장을 계기로 승격.
+  `FleetKit` 이 항상 내부에서 `ObservingFleetSink` 로 감싼다.
+- `FleetRuntime.extra`(`Map<String, Object?>`, 기본 `const {}`) — 앱 고유 진단
+  값의 자유 확장 슬롯. 스칼라 1단계만, 2KB(`FleetRuntime.extraMaxBytes`) 상한
+  초과 시 drop+warn(throw 안 함). **`FleetDeviceInfo` 에는 절대 넣지 않는다**
+  — 거기 섞이면 `fingerprint` 가 매 틱 달라져 register 가 발화하고 서버의
+  boot_count(크래시 루프 지표)가 오염된다.
+- `FleetAppTypes`(`orderAgent`/`did`/`kiosk`) — `appType` 편의 상수. **`appType`
+  자체는 여전히 `String`** — `FleetCommand.type` 과 같은 이유로 enum 화하지
+  않는다(새 앱 추가가 core 재릴리즈를 강제하면 안 됨).
+- `docs/FLEET_ADOPTION.md` — 새 앱 채택 절차 정본(7단계 체크리스트).
+
+### Changed
+- `FleetRuntime.mode` 주석: "MAIN | KDS. DID/KIOSK 는 null" → "앱별 자유
+  어휘. 서버는 TEXT 로 저장만 한다" — 필드 타입(`String?`)은 이미 자유
+  어휘를 허용했고, 주석만 실제 규약(DID 의 SIGNAGE/ORDER_NUMBER 등 허용)에
+  맞게 바로잡음. 코드 변경 없음.
+- `device_info_plus`/`package_info_plus` 의존 범위를 caret(`^`)에서 넓은
+  범위(`">=X <Y"`)로 완화 — 공유 SDK 라 소비 앱 3곳의 버전이 갈라질 수 있음.
+
+### ⚠️ order_agent 채택 시 필수 조치 (breaking for one consumer)
+`fleet_connection_status.dart`/`observing_fleet_sink.dart` 를 core 가 이제
+동일한 이름으로 export 한다. `appfit_order_agent/lib/providers/fleet_provider.dart`
+가 `package:appfit_core/appfit_core.dart` 와 로컬 두 파일을 **동시에** import
+하므로, ref 를 v1.1.0 으로 올리는 순간 타입이 ambiguous 해져 빌드가 깨진다.
+**ref 범프 + 로컬 두 파일 삭제 + import 정리를 반드시 한 커밋에 원자적으로.**
+그 외 order_agent 의 기존 배선(`OrderAgentFleetSnapshotBuilder`/
+`fleet_provider.dart` 의 provider 6개/`DeviceIdentityService`)은 그대로
+유지되며 `FleetKit` 이전은 이번 릴리스 범위가 아니다(후속 PR, 실기기 파일럿
+안정화 이후).
+
+## v1.0.18 — 기기 관제(Fleet) 승격
 
 ### Added
 - `src/fleet/` 신설 — 기기 실행상태·기기정보 보고 + 원격 명령(로그 업로드 등)을

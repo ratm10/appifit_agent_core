@@ -52,8 +52,17 @@ export 'src/monitoring/monitoring_context.dart';
 export 'src/monitoring/monitoring_service.dart';
 export 'src/monitoring/sentry_appfit_logger.dart';
 
+// Device (기계적 기기·앱 정보 수집 — Fleet/Monitoring 공유)
+export 'src/device/device_probe.dart';
+
 // Fleet (기기 관제 — 실행상태/기기정보 보고 + 원격 명령)
 export 'src/fleet/fleet_models.dart';
 export 'src/fleet/fleet_sink.dart';
 export 'src/fleet/http_fleet_sink.dart';
 export 'src/fleet/fleet_reporter.dart';
+export 'src/fleet/fleet_identity.dart';
+export 'src/fleet/fleet_app_state.dart';
+export 'src/fleet/fleet_connection_status.dart';
+export 'src/fleet/observing_fleet_sink.dart';
+export 'src/fleet/fleet_snapshot_assembler.dart';
+export 'src/fleet/fleet_kit.dart';

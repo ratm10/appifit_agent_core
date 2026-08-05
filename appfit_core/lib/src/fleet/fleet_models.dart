@@ -16,6 +16,17 @@ extension FleetStatusWire on FleetStatus {
   String get value => this == FleetStatus.closing ? 'closing' : 'online';
 }
 
+/// [FleetDeviceInfo.appType] 값 상수. **편의 제공일 뿐** — [FleetCommand.type]
+/// 과 같은 이유로 `appType` 자체는 `String` 으로 남는다. enum 이면 새 앱을
+/// 추가할 때마다 core 재릴리즈 + 기존 앱들의 ref 범프가 강제된다.
+class FleetAppTypes {
+  FleetAppTypes._();
+
+  static const String orderAgent = 'ORDER_AGENT';
+  static const String did = 'DID';
+  static const String kiosk = 'KIOSK';
+}
+
 /// 정적 기기 정보. 값이 바뀌면 재등록(register)이 발화한다.
 ///
 /// [deviceId] 는 **반드시 소비 앱이 조달한다.** 이 모듈은 어떤 식별자도
@@ -114,7 +125,8 @@ class FleetRuntime {
   final String lifecycle;
   final bool socketConnected;
 
-  /// MAIN | KDS. DID/KIOSK 는 null.
+  /// 앱별 자유 어휘(예: ORDER_AGENT 는 MAIN|KDS, DID 는 SIGNAGE|ORDER_NUMBER).
+  /// 서버는 이 값을 그대로 TEXT 로 저장만 한다.
   final String? mode;
   final bool? businessOpen;
 
@@ -124,6 +136,19 @@ class FleetRuntime {
   /// 장시간 명령(로그 zip)이 진행 중인지.
   final bool commandRunning;
 
+  /// 앱 고유 진단 값의 자유 확장 슬롯. 스칼라(String/num/bool/null) 1단계만
+  /// 허용하며 직렬화 크기 상한은 [extraMaxBytes]다. 필터/정렬/알림 대상이
+  /// 되어야 하면 그때 정식 [FleetRuntime] 필드로 승격한다 — 이 필드는
+  /// "이미 기기 하나를 들여다보는 중일 때 보고 싶은 값" 전용이다.
+  ///
+  /// **[FleetDeviceInfo] 에는 절대 두지 않는다.** 거기 섞이면 값이 바뀔
+  /// 때마다 [FleetDeviceInfo.fingerprint] 가 달라져 register 가 매번
+  /// 발화하고, 서버의 boot_count(크래시 루프 지표)가 오염된다.
+  final Map<String, Object?> extra;
+
+  /// [extra] 직렬화 크기 상한(바이트). 초과분은 sink 조립 시점에 버려진다.
+  static const int extraMaxBytes = 2048;
+
   const FleetRuntime({
     required this.status,
     required this.lifecycle,
@@ -132,9 +157,14 @@ class FleetRuntime {
     this.businessOpen,
     this.connection,
     this.commandRunning = false,
+    this.extra = const {},
   });
 
-  FleetRuntime copyWith({FleetStatus? status, bool? commandRunning}) =>
+  FleetRuntime copyWith({
+    FleetStatus? status,
+    bool? commandRunning,
+    Map<String, Object?>? extra,
+  }) =>
       FleetRuntime(
         status: status ?? this.status,
         lifecycle: lifecycle,
@@ -143,6 +173,7 @@ class FleetRuntime {
         businessOpen: businessOpen,
         connection: connection,
         commandRunning: commandRunning ?? this.commandRunning,
+        extra: extra ?? this.extra,
       );
 
   Map<String, dynamic> toJson() => {
@@ -153,6 +184,7 @@ class FleetRuntime {
         'businessOpen': businessOpen,
         'connection': connection,
         'commandRunning': commandRunning,
+        if (extra.isNotEmpty) 'extra': extra,
       };
 }
 
