@@ -113,6 +113,31 @@ void main() {
     kit.dispose();
   });
 
+  test(
+      'baseUrl/deviceKey 미설정(Noop) 상태에서 register/heartbeat 가 성공해도 '
+      'connected 로 오판하지 않는다', () {
+    fakeAsync((async) {
+      final kit = FleetKit(
+        appType: 'TEST',
+        readAppState: _appState,
+        identity: _FakeIdentityResolver(),
+        deviceProbe: _FakeProbe(),
+        isOnline: () async => true,
+        readConnection: () async => 'wifi',
+        jitterMs: 0,
+        observeLifecycle: false,
+      )..start();
+
+      async.elapse(const Duration(milliseconds: 1));
+
+      // NoopFleetSink.register()/heartbeat() 는 항상 success:true 를 돌려주므로,
+      // 이를 ObservingFleetSink 로 감쌌다면 여기서 connected 로 잘못 전환된다.
+      expect(kit.connectionStatus.value, FleetConnectionStatus.disabled);
+
+      kit.stop();
+    });
+  });
+
   test('start/stop 이 케이던스를 제어한다', () {
     fakeAsync((async) {
       final sink = _FakeSink();

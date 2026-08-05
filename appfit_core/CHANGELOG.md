@@ -3,7 +3,24 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.1.0 (현재) — Fleet 채택 파사드(`FleetKit`)
+## v1.1.1 (현재) — FleetKit Noop 오판 수정
+
+v1.1.0 을 DID 실기기(IM-H092)에 처음 붙여보면서 발견: `FLEET_BASE_URL`/
+`FLEET_DEVICE_KEY` 미설정 빌드에서도 `FleetKit.connectionStatus` 가
+`disabled → connected` 로 전환되는 오판이 있었다. 원인은
+`FleetKit` 생성자가 목적지가 `NoopFleetSink` 인지 여부와 무관하게 항상
+`ObservingFleetSink` 로 감쌌기 때문 — `NoopFleetSink.register()`/
+`heartbeat()` 는 항상 `success:true` 를 돌려주므로, 그 결과를 그대로
+관찰하면 "아무것도 전송하지 않는데 연결됨"으로 보인다.
+
+### Fixed
+- `FleetKit`: 목적지가 `isConfigured == true` 일 때만 `ObservingFleetSink` 로
+  감싼다. Noop 상태에서는 감싸지 않고 그대로 사용 — order_agent 의 기존
+  `fleetSinkProvider` 가 원래 갖고 있던 이 조건을 파사드로 옮기며 놓쳤던
+  부분. 회귀 테스트 `fleet_kit_test.dart`("Noop 상태에서 connected 로
+  오판하지 않는다") 추가.
+
+## v1.1.0 — Fleet 채택 파사드(`FleetKit`)
 
 세 번째 소비 앱(`did`)이 fleet 을 채택하며 드러난 문제: 앱당 채택 비용이
 스냅샷 빌더(~110줄)+riverpod 배선(~140줄)+식별자 서비스(~190줄)+연결상태

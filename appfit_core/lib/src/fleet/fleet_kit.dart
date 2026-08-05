@@ -87,17 +87,22 @@ class FleetKit with WidgetsBindingObserver {
                 baseUrl: baseUrl, deviceKey: deviceKey, logger: logger)
             : NoopFleetSink(logger: logger));
 
-    _sink = ObservingFleetSink(
-      inner: destination,
-      onStatus: (status) {
-        if (_connectionStatus.value != status) {
-          _logger?.debug(
-            '[Fleet] 연결 상태 전환: ${_connectionStatus.value.name} → ${status.name}',
-          );
-        }
-        _connectionStatus.value = status;
-      },
-    );
+    // 설정 없는 빌드(Noop)는 감싸지 않는다. NoopFleetSink 는 항상
+    // success:true 를 돌려주므로, 여기서 감싸면 아무것도 전송하지 않는데도
+    // 연결 상태가 "connected" 로 표시되는 오판이 생긴다.
+    _sink = destination.isConfigured
+        ? ObservingFleetSink(
+            inner: destination,
+            onStatus: (status) {
+              if (_connectionStatus.value != status) {
+                _logger?.debug(
+                  '[Fleet] 연결 상태 전환: ${_connectionStatus.value.name} → ${status.name}',
+                );
+              }
+              _connectionStatus.value = status;
+            },
+          )
+        : destination;
 
     _assembler = FleetSnapshotAssembler(
       appType: appType,
