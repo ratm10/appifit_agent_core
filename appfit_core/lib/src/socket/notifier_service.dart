@@ -53,9 +53,23 @@ class AppFitNotifierService {
   // 재연결 관련
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
+
+  /// 짧은 백오프(3→6→12→24→48초)로 빠르게 재시도하는 횟수.
+  ///
+  /// 이 횟수를 소진해도 **포기하지 않는다** — [_maxDelaySeconds] 간격의 느린
+  /// 재시도로 넘어갈 뿐이다. 이전에는 여기서 완전히 멈췄고, 링크는 살아 있고
+  /// 상위 경로만 죽는 장애에서는 connectivity 이벤트가 오지 않아 앱 재시작
+  /// 전까지 실시간 수신이 영구히 끊겼다.
+  static const int _fastReconnectAttempts = 5;
   static const int _initialDelaySeconds = 3;
   static const int _maxDelaySeconds = 300;
+
+  /// 빠른 재시도를 모두 소진해 느린 재시도 구간에 들어간 상태.
+  ///
+  /// 이 구간에서는 상태를 [ConnectionStatus.disconnected] 로 고정한다
+  /// (매 시도마다 reconnecting↔disconnected 를 반복하면 앱 UI 가 5분마다
+  /// 깜빡이고 모니터링의 flapping 감지가 오탐한다).
+  bool _isInSlowRetry = false;
 
   // Heartbeat (Ghost Connection 감지)
   Timer? _heartbeatTimer;
@@ -174,6 +188,7 @@ class AppFitNotifierService {
     _cachedApiKey = apiKey;
     _cachedAesKey = aesKey;
     _reconnectAttempts = 0;
+    _isInSlowRetry = false;
     _reconnectTimer?.cancel();
 
     // Connectivity 리스너 시작 (이전 구독 완전 정리 후 재등록)
@@ -232,7 +247,9 @@ class AppFitNotifierService {
       _isConnected = true;
       _connectedAt = DateTime.now();
       _lastMessageAt = null;
+      final recoveredAfterAttempts = _isInSlowRetry ? _reconnectAttempts : null;
       _reconnectAttempts = 0;
+      _isInSlowRetry = false;
       _reconnectTimer?.cancel(); // 연결 성공 시 예약된 재연결 타이머 취소
       _reconnectTimer = null;
 
@@ -244,7 +261,13 @@ class AppFitNotifierService {
         _safeAddConnectionState(ConnectionStatus.initialConnected);
       }
       _startHeartbeat();
-      await _logger.log('[Notifier] 연결 성공');
+      // 느린 재시도에서 복귀한 경우는 시도 횟수를 함께 남긴다 — 장시간 단절이
+      // 자력 복구됐다는(= 2단계 백오프가 실제로 동작했다는) 유일한 증거다.
+      await _logger.log(
+        recoveredAfterAttempts == null
+            ? '[Notifier] 연결 성공'
+            : '[Notifier] 연결 성공 (느린 재시도 $recoveredAfterAttempts번째 시도에서 복구)',
+      );
 
       // 4. 리스너 등록
       _socketSubscription = _channel!.stream.listen(
@@ -389,28 +412,50 @@ class AppFitNotifierService {
     // ignore: unawaited_futures
     _cleanupConnection().whenComplete(() {
       _isConnected = false;
-      _safeAddConnectionState(ConnectionStatus.reconnecting);
+      // 느린 재시도 구간에서는 disconnected 를 유지한다 — 5분마다
+      // reconnecting 으로 되돌리면 UI 가 깜빡이고 flapping 감지가 오탐한다.
+      if (!_isInSlowRetry) {
+        _safeAddConnectionState(ConnectionStatus.reconnecting);
+      }
       _scheduleReconnect();
       _isHandlingDisconnection = false;
     });
   }
 
-  /// 재연결 스케줄링 (Exponential Backoff)
+  /// 재연결 스케줄링 (2단계 백오프)
+  ///
+  /// 1단계(빠름): 3→6→12→24→48초, 누적 93초. 순단·서버 재시작 등 대부분의
+  /// 끊김은 여기서 복구된다.
+  /// 2단계(느림): 이후 [_maxDelaySeconds] 간격으로 **무한** 재시도. 전환 시점에
+  /// 한 번만 [ConnectionStatus.disconnected] 를 알려 앱이 "장시간 끊김" UI
+  /// (수동 재연결 어포던스 포함)를 띄울 수 있게 한다.
   void _scheduleReconnect() {
     if (_isDisposed) return;
     if (_cachedShopCode == null) return; // 연결 정보 없으면 재연결 불가
 
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
-      _logger.error('[Notifier] 최대 재연결 횟수 초과. 네트워크 복원 대기.', null);
-      _safeAddConnectionState(ConnectionStatus.disconnected);
-      return;
+    final int delaySeconds;
+    if (_reconnectAttempts >= _fastReconnectAttempts) {
+      if (!_isInSlowRetry) {
+        _isInSlowRetry = true;
+        _logger.error(
+          '[Notifier] 빠른 재연결 $_fastReconnectAttempts회 실패 '
+          '— $_maxDelaySeconds초 간격 재시도로 전환 (계속 시도함)',
+          null,
+        );
+        _safeAddConnectionState(ConnectionStatus.disconnected);
+      }
+      // 느린 구간은 pow 를 쓰지 않는다. 무한 재시도에서 지수가 계속 커지면
+      // pow(2, 1024) 가 double.infinity 가 되어 toInt() 가 던진다(5분 간격이면
+      // 약 3.5일 연속 다운에서 도달). 이 분기 덕에 아래 pow 의 지수는 항상
+      // 4 이하로 묶인다.
+      delaySeconds = _maxDelaySeconds;
+    } else {
+      delaySeconds = min(
+        _initialDelaySeconds *
+            pow(2, _reconnectAttempts).toInt(), // 3→6→12→24→48
+        _maxDelaySeconds,
+      );
     }
-
-    final delaySeconds = min(
-      _initialDelaySeconds *
-          pow(2, _reconnectAttempts).toInt(), // 3→6→12→24→...
-      _maxDelaySeconds, // 최대 300초(5분)
-    );
     _reconnectAttempts++;
     _logger.log('[Notifier] $_reconnectAttempts번째 재연결 예약 ($delaySeconds초 후)');
 
@@ -454,6 +499,7 @@ class AppFitNotifierService {
     if (_isConnected || _isConnecting) return; // 연결 시도 중에도 무시
     _logger.log('[Notifier] 네트워크 복원 -> backoff 초기화 후 즉시 재연결');
     _reconnectAttempts = 0;
+    _isInSlowRetry = false; // 다음 끊김에서 reconnecting 을 다시 알리기 위해 해제
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _scheduleReconnect();
@@ -478,6 +524,8 @@ class AppFitNotifierService {
   Future<void> disconnect() async {
     _logger.log('[Notifier] 서비스 종료 (Disconnect)');
     _reconnectTimer?.cancel();
+    _reconnectAttempts = 0;
+    _isInSlowRetry = false;
     await _connectivitySubscription?.cancel(); // connectivity 리스너 정리
     _connectivitySubscription = null;
     await _cleanupConnection();

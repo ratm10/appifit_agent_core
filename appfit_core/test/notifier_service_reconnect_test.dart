@@ -233,16 +233,77 @@ void main() {
         ],
       );
 
-      // 6번째 실패 후 최대 횟수(5회 재시도) 초과 → disconnected
+      // 6번째 실패 후 빠른 재시도(5회) 소진 → disconnected 로 "장시간 끊김" 통지
       expect(
         h.statuses,
         List.filled(6, ConnectionStatus.reconnecting) +
             [ConnectionStatus.disconnected],
       );
 
-      // 이후 추가 재시도는 없다
-      await h.elapse(const Duration(minutes: 10));
-      expect(h.attempts, 6);
+      // 그러나 멈추지 않는다 — 5분 간격으로 무한 재시도한다.
+      // (예전에는 여기서 완전히 정지해, 링크가 살아 있고 상위 경로만 죽는
+      //  장애에서는 connectivity 이벤트가 오지 않아 앱 재시작 전까지
+      //  실시간 수신이 영구히 끊겼다.)
+      await h.elapse(const Duration(seconds: 300));
+      expect(h.attempts, 7);
+      expect(h.attemptElapsed.last, const Duration(seconds: 393));
+
+      await h.elapse(const Duration(seconds: 300));
+      expect(h.attempts, 8);
+      expect(h.attemptElapsed.last, const Duration(seconds: 693));
+    });
+
+    test('느린 재시도 구간에서는 상태를 다시 emit 하지 않는다 (UI 깜빡임·flapping 오탐 방지)', () async {
+      final h = _Harness(FakeAsync(), successScript: [false]);
+      await h.connect();
+      for (final delay in const [3, 6, 12, 24, 48]) {
+        await h.elapse(Duration(seconds: delay));
+      }
+      final atSlowEntry = List.of(h.statuses);
+      expect(atSlowEntry.last, ConnectionStatus.disconnected);
+
+      // 느린 재시도 3회를 더 돌려도 상태 스트림은 조용해야 한다
+      for (var i = 0; i < 3; i++) {
+        await h.elapse(const Duration(seconds: 300));
+      }
+      expect(h.attempts, 9);
+      expect(h.statuses, atSlowEntry);
+    });
+
+    test('느린 재시도 중 연결에 성공하면 reconnected 로 복귀하고 백오프가 3초부터 다시 시작한다', () async {
+      // 최초 연결 성공 → 끊김 → 빠른 재시도 5회 전부 실패 → 느린 재시도 1회째 성공
+      final h = _Harness(
+        FakeAsync(),
+        successScript: [true, false, false, false, false, false, true],
+      );
+      await h.connect();
+      h.sockets.single.closeFromServer();
+      await h.pump();
+      for (final delay in const [3, 6, 12, 24, 48]) {
+        await h.elapse(Duration(seconds: delay));
+      }
+      expect(h.statuses.last, ConnectionStatus.disconnected);
+
+      await h.elapse(const Duration(seconds: 300));
+      expect(h.attempts, 7);
+      expect(
+        h.statuses,
+        [ConnectionStatus.initialConnected] +
+            List.filled(6, ConnectionStatus.reconnecting) +
+            [ConnectionStatus.disconnected, ConnectionStatus.reconnected],
+      );
+
+      // 복구 후 다시 끊기면 300초가 아니라 3초 뒤에 재시도한다
+      h.sockets.last.closeFromServer();
+      await h.pump();
+      expect(h.statuses.last, ConnectionStatus.reconnecting);
+
+      await h.elapse(const Duration(seconds: 3));
+      expect(h.attempts, 8);
+      expect(h.attemptElapsed.last, const Duration(seconds: 396));
+      expect(h.statuses.last, ConnectionStatus.reconnected);
+
+      await h.dispose();
     });
 
     test('백오프 소진 후 notifyNetworkRestored 가 3초 재시도로 다시 시작한다', () async {
@@ -362,6 +423,24 @@ void main() {
       h.fake.run((_) => h.service.notifyNetworkRestored());
       await h.elapse(const Duration(minutes: 10));
       expect(h.attempts, 1);
+
+      await h.dispose();
+    });
+
+    test('느린 재시도 중 disconnect 하면 무한 재시도가 확실히 멈춘다', () async {
+      // 재시도가 무한이 된 만큼, 로그아웃 후 타이머가 살아남으면 기기가 영영
+      // 재연결을 시도한다. 그 누수가 없음을 고정한다.
+      final h = _Harness(FakeAsync(), successScript: [false]);
+      await h.connect();
+      for (final delay in const [3, 6, 12, 24, 48]) {
+        await h.elapse(Duration(seconds: delay));
+      }
+      expect(h.attempts, 6);
+      expect(h.statuses.last, ConnectionStatus.disconnected);
+
+      await h.disconnect();
+      await h.elapse(const Duration(minutes: 30));
+      expect(h.attempts, 6, reason: '로그아웃 후에는 한 번도 더 시도하지 않아야 한다');
 
       await h.dispose();
     });

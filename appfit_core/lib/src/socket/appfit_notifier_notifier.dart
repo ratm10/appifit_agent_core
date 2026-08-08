@@ -59,4 +59,15 @@ class AppFitNotifierNotifier extends Notifier<ConnectionStatus> {
       );
 
   Future<void> disconnect() => _coreService.disconnect();
+
+  /// 네트워크가 복원됐음을 앱이 직접 알린다 — 백오프를 초기화하고 즉시 재연결.
+  ///
+  /// 코어는 connectivity 인터페이스 변경 이벤트로 복원을 감지하지만, 링크는
+  /// 살아 있고 상위 경로(DNS/라우팅)만 죽는 장애에서는 그 이벤트가 오지 않는다.
+  /// 앱이 다른 경로로 복원을 확인했다면(예: HTTP 요청이 다시 성공) 이 메서드로
+  /// 느린 재시도(5분 간격) 대기를 건너뛸 수 있다.
+  ///
+  /// 이미 연결됐거나 연결 시도 중이면, 또는 로그아웃 상태(연결 정보 없음)면
+  /// 코어에서 무시되므로 호출측이 상태를 따로 검사할 필요는 없다.
+  void notifyNetworkRestored() => _coreService.notifyNetworkRestored();
 }
