@@ -3,7 +3,33 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.2.0 (현재) — 소켓 재연결이 더 이상 포기하지 않는다
+## v1.3.0 (현재) — 매장 카탈로그 중첩 조회 경로 추가
+
+`appfit_order_agent` 의 상품 조회가 `/v0/shops/{shopCode}/categories` 에서
+`/categories/items` 로 옮겨갔다. 소비자 앱이 경로 문자열을 직접 조립하고 있어
+(`'${ApiRoutes.shopCategories(id)}/items'`) `ApiRoutes` 로 승격한다.
+
+### Added
+- `ApiRoutes.shopCategoryItems(storeId)` — `/v0/shops/{storeId}/categories/items`.
+
+  `shopCategories` 와 달리 옵션이 매장 전역 평면 `options[]` 가 아니라 상품별
+  `optionGroups[]` 안에 중첩돼 오고, 그룹의 POS 코드(`optionGroupPosId`)가 함께
+  온다. 덕분에 옵션의 카테고리 코드를 얻으려고 `/v0/migration/options` 를 한 번 더
+  호출해 조인할 필요가 없어진다.
+
+  **주의: 같은 옵션이 상품×그룹마다 반복 등장한다.** 옵션을 평면 목록으로 쓰려는
+  소비자는 `optionId` 기준 중복 제거가 필수다 — MMTH00084 실측 기준 원본 4540건이
+  고유 148건(30.7배)이었고, 접지 않으면 옵션 모델이 30배로 불어난다.
+
+- `test/api_routes_test.dart` — 매장 카탈로그 계열 경로 문자열 고정. 경로가
+  조용히 바뀌면 소비자 앱에서 런타임 404 로만 드러나기 때문이다.
+
+### Notes
+- 기존 `shopCategories` / `migrationOptions` 는 그대로 둔다. `did`·`kiosk` 의
+  사용 여부를 확인하지 않았고, 상수 제거는 breaking 이다.
+- 공개 API 추가만 있고 시그니처 변경은 없다 — 소비자 앱은 ref 를 올리기만 하면 된다.
+
+## v1.2.0 — 소켓 재연결이 더 이상 포기하지 않는다
 
 2026-08-07 PAIK00002(新橋店) 매장 장애 분석의 결론. 인터넷은 끊기지 않았는데
 매장 네트워크 상위 경로만 죽는 구간이 14분씩 두 번 있었고, 그동안

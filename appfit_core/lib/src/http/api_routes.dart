@@ -24,6 +24,17 @@ class ApiRoutes {
       '$version/shop/$storeId/operating-status';
   static String shopCategories(String storeId) =>
       '$version/shops/$storeId/categories';
+
+  /// 카테고리 + 상품 + 옵션그룹을 중첩 구조로 조회한다.
+  ///
+  /// [shopCategories] 와 달리 옵션이 매장 전역 평면 목록이 아니라 상품별
+  /// `optionGroups[]` 안에 실려 오며, 그룹의 POS 코드(`optionGroupPosId`)가
+  /// 함께 온다. 대신 **같은 옵션이 상품×그룹마다 반복 등장**하므로 옵션을
+  /// 평면 목록으로 쓰려는 소비자는 `optionId` 기준 중복 제거가 필요하다
+  /// (실측: 원본 4540건 → 고유 148건).
+  static String shopCategoryItems(String storeId) =>
+      '${shopCategories(storeId)}/items';
+
   static String shopItemStatus(String storeId) =>
       '$version/shops/$storeId/items/status';
   static String shopOptionStatus(String storeId) =>
