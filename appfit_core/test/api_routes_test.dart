@@ -29,4 +29,22 @@ void main() {
           '/v0/shops/MMTH00084/options/status');
     });
   });
+
+  // 두 경로는 요청 DTO 가 다른데(기간 vs 주문번호) 서버가 모르는 필드를 조용히
+  // 버리므로, 상수를 잘못 고르면 400 이 아니라 "기간 전체 완료" 로 나타난다.
+  // 경로가 뒤바뀌는 회귀를 컴파일이 아니라 여기서 잡는다.
+  group('ApiRoutes 주문 일괄 완료', () {
+    test('bulkOrdersDone — 기간 단위 (READY → DONE)', () {
+      expect(ApiRoutes.bulkOrdersDone, '/v0/orders/bulk-done');
+    });
+
+    test('forceBulkOrdersDone — 주문번호 지정 강제 완료', () {
+      expect(ApiRoutes.forceBulkOrdersDone, '/v0/orders/force/bulk-done');
+    });
+
+    test('둘은 서로 다른 경로다', () {
+      expect(ApiRoutes.forceBulkOrdersDone,
+          isNot(equals(ApiRoutes.bulkOrdersDone)));
+    });
+  });
 }

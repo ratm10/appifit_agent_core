@@ -53,7 +53,21 @@ class ApiRoutes {
       '$versionV1/order/$orderId/cancel';
 
   // 일괄 완료 처리는 v1 미제공이라 v0 유지.
+  //
+  // 아래 두 경로는 **요청 DTO 가 다르다**. 서버는 모르는 필드를 에러 없이 버리므로
+  // 잘못 고른 경로가 400 으로 드러나지 않는다 — 조용히 엉뚱한 대상을 완료시킨다.
+  //   bulkOrdersDone      : {shopCode, from, to}  기간 단위, READY → DONE
+  //   forceBulkOrdersDone : {shopCode, orderNos[]} 주문번호 지정, PREPARING/READY → DONE
+  // 특히 forceBulkOrdersDone 에 orderNos 를 빠뜨리면 400 이지만, bulkOrdersDone 에
+  // orderNos 를 보내면 무시된 채 **기간 전체**가 완료된다.
   static const String bulkOrdersDone = '$version/orders/bulk-done';
+
+  /// 주문번호를 지정해 선행 상태 검증 없이 완료까지 강제 이행한다.
+  ///
+  /// PREPARING 주문이 픽업 요청을 거치지 않고 바로 DONE 이 된다. 단건도 이 경로로
+  /// `orderNos` 원소 1개를 보낸다(최대 100건, 중복은 1건으로 처리). 부분 실패해도
+  /// 200 이므로 성공 판정은 응답의 `results[].success` 로 한다.
+  static const String forceBulkOrdersDone = '$version/orders/force/bulk-done';
 
   // Stamp
   static const String stampEarn = '$version/stamp/earn';
