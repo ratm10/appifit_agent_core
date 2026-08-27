@@ -24,6 +24,28 @@ class SentryAppFitLogger implements AppFitLogger {
     'INVALID_ORDER_STATUS', // 이미 픽업/완료/취소/수락된 주문 등
   };
 
+  /// **엔드포인트 단위**로 좁힌 benign 판정. 키는 템플릿 경로
+  /// ([ApiHttpException.path]), 값은 그 경로에서만 양성으로 볼 서버 코드.
+  ///
+  /// `INVALID_REQUEST` 같은 범용 검증 코드를 [benignServerCodes] 에 넣으면
+  /// **우리가 잘못된 본문을 보낸 진짜 결함까지 통째로 묻힌다.** 그래서 "사용자가
+  /// 입력한 값이 틀렸을 뿐"이라고 단정할 수 있는 경로에서만 허용한다.
+  static const Map<String, Set<String>> benignServerCodesByPath = {
+    // 쿠폰 사용: 운영자가 입력란에 쿠폰번호 대신 전화번호를 넣거나 오타를 낸
+    // 경우다. 멤버십 화면은 입력란 하나를 [회원조회]와 [쿠폰사용]이 공유해서
+    // 구조적으로 재발한다. 앱이 입력을 걸러도(전화번호 패턴 차단) 단순 오타는
+    // 남으므로, 이 경로의 검증 실패는 issue 가 아니라 breadcrumb 이 맞다.
+    '/v0/coupon/{id}/use-without-item': {'INVALID_REQUEST'},
+  };
+
+  /// issue 대신 breadcrumb 으로만 남길 오류인지.
+  static bool isBenign(ApiHttpException error) {
+    final code = error.code;
+    if (code == null) return false;
+    if (benignServerCodes.contains(code)) return true;
+    return benignServerCodesByPath[error.path]?.contains(code) ?? false;
+  }
+
   @override
   Future<void> log(String message) async {
     // 일반 로그는 기존 로거에만 기록 (Sentry breadcrumb 전송 안 함)
@@ -39,7 +61,7 @@ class SentryAppFitLogger implements AppFitLogger {
 
       // 예상된 비즈니스 오류 → breadcrumb(info)만, issue 미전송.
       // 서버 메시지/코드는 그대로 보존되어 추적 시 컨텍스트로 보인다.
-      if (error.code != null && benignServerCodes.contains(error.code)) {
+      if (isBenign(error)) {
         Sentry.addBreadcrumb(Breadcrumb(
           message: error.toString(),
           category: 'http',

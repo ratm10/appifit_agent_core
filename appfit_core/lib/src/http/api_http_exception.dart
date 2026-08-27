@@ -24,7 +24,13 @@ class ApiHttpException implements Exception {
   /// 서버 응답 본문의 `code` (예: `INVALID_ORDER_STATUS`).
   final String? code;
 
-  /// 서버 응답 본문의 `message` (서버 원문).
+  /// 서버 응답 본문의 `message`.
+  ///
+  /// **6자리 이상 숫자열이 마스킹된 상태로 보관된다** ([redactDigitRuns]).
+  /// 서버가 입력값을 그대로 되돌려주는 메시지(`Invalid couponNo: 01092337380`)가
+  /// 있어서, 원문을 그대로 두면 [toString] 을 통해 Sentry 이슈 제목 → Slack
+  /// 알림까지 고객 전화번호가 흘러갔다. 원문이 필요한 호출부(사용자 노출
+  /// 다이얼로그 등)는 `cause.response?.data['message']` 를 직접 읽는다.
   final String? serverMessage;
 
   /// 추적용 요청 ID (`x-request-id` 헤더).
@@ -44,6 +50,23 @@ class ApiHttpException implements Exception {
     required this.cause,
   });
 
+  /// 6자리 이상 연속 숫자. 전화번호(9~11자리)·쿠폰번호(16자리)·주문번호(18자리)를
+  /// 덮으면서 상태코드·개수·연도 같은 짧은 숫자는 건드리지 않는 하한이다.
+  static final RegExp _digitRun = RegExp(r'\d{6,}');
+
+  /// 6자리 이상 숫자열을 같은 길이의 `*` 로 치환한다.
+  /// `Invalid couponNo: 01092337380` -> `Invalid couponNo: ***********`
+  ///
+  /// [templatePath] 가 경로의 긴 식별자를 `{id}` 로 지우는 것과 같은 정책을,
+  /// 식별자가 실려 오는 다른 통로인 서버 `message` 에 적용한 것이다. 길이를
+  /// 보존하는 이유는 자릿수가 진단 단서이기 때문이다 — 11자리면 전화번호,
+  /// 16자리면 쿠폰번호를 잘못 넣었다는 뜻이라 값 없이도 원인이 잡힌다.
+  ///
+  /// 앱 쪽에서 같은 서버 메시지를 로그/breadcrumb 으로 남길 때도 이 함수를 쓴다
+  /// (규칙이 두 벌로 갈라지면 한쪽만 새는 구멍이 생긴다).
+  static String redactDigitRuns(String value) =>
+      value.replaceAllMapped(_digitRun, (m) => '*' * m[0]!.length);
+
   /// orderId 등 숫자/긴 식별자 세그먼트를 `{id}` 로 치환해 그룹핑을 안정화한다.
   /// 예: `/v0/order/849083306090384177` -> `/v0/order/{id}`
   static String templatePath(String path) {
@@ -58,13 +81,16 @@ class ApiHttpException implements Exception {
     final body = err.response?.data;
     final map = body is Map ? body : const <dynamic, dynamic>{};
     final raw = err.requestOptions.path;
+    final rawMessage = map['message']?.toString();
     return ApiHttpException(
       status: err.response?.statusCode,
       method: err.requestOptions.method,
       path: templatePath(raw),
       rawPath: raw,
       code: map['code']?.toString(),
-      serverMessage: map['message']?.toString(),
+      // 생성 시점에 마스킹한다 — 이 객체가 닿는 곳(toString/toExtras/breadcrumb)
+      // 전부가 Sentry 행이라, 출력 지점마다 거는 방식은 하나만 빠뜨려도 샌다.
+      serverMessage: rawMessage == null ? null : redactDigitRuns(rawMessage),
       requestId: err.response?.headers.value('x-request-id'),
       cause: err,
     );

@@ -68,6 +68,45 @@ void main() {
     });
   });
 
+  group('ApiHttpException.redactDigitRuns', () {
+    test('6자리 이상 숫자열은 같은 길이의 * 로 바뀐다', () {
+      expect(
+        ApiHttpException.redactDigitRuns('Invalid couponNo: 01092337380'),
+        'Invalid couponNo: ***********',
+      );
+      expect(
+        ApiHttpException.redactDigitRuns('쿠폰 5001868426241491 없음'),
+        '쿠폰 **************** 없음',
+      );
+    });
+
+    test('한 메시지에 여러 개가 있어도 모두 바뀐다', () {
+      expect(
+        ApiHttpException.redactDigitRuns('849083306090384177 -> 01092337380'),
+        '****************** -> ***********',
+      );
+    });
+
+    test('5자리 이하는 건드리지 않는다 — 상태코드·개수·연도는 진단 정보다', () {
+      expect(
+        ApiHttpException.redactDigitRuns('400 오류: 2026년 12건 처리'),
+        '400 오류: 2026년 12건 처리',
+      );
+      expect(ApiHttpException.redactDigitRuns('12345'), '12345');
+    });
+
+    test('경계: 정확히 6자리부터 마스킹', () {
+      expect(ApiHttpException.redactDigitRuns('123456'), '******');
+    });
+
+    test('숫자에 붙은 문자는 보존한다', () {
+      expect(
+        ApiHttpException.redactDigitRuns('order-849083306090384177-x'),
+        'order-******************-x',
+      );
+    });
+  });
+
   group('ApiHttpException.fromDio', () {
     test('서버 본문(code/message)/상태/requestId/경로를 추출한다', () {
       final exception = ApiHttpException.fromDio(_dioError(
@@ -87,6 +126,21 @@ void main() {
       expect(exception.code, 'INVALID_ORDER_STATUS');
       expect(exception.serverMessage, '이미 픽업 요청된 주문입니다.');
       expect(exception.requestId, 'req-123');
+    });
+
+    test('서버 메시지의 6자리 이상 숫자열은 생성 시점에 마스킹된다', () {
+      // 실제 사고: 운영자가 쿠폰 입력란에 고객 전화번호를 넣어 400 이 났고,
+      // 서버가 입력값을 되돌려준 메시지가 Sentry 이슈 제목 → Slack 으로 나갔다.
+      final exception = ApiHttpException.fromDio(_dioError(
+        path: '/v0/coupon/01092337380/use-without-item',
+        method: 'POST',
+        data: <String, dynamic>{
+          'code': 'INVALID_REQUEST',
+          'message': 'Invalid couponNo: 01092337380',
+        },
+      ));
+      expect(exception.serverMessage, 'Invalid couponNo: ***********');
+      expect(exception.toString(), isNot(contains('01092337380')));
     });
 
     test('본문이 Map 이 아니면 code/serverMessage 는 null', () {
