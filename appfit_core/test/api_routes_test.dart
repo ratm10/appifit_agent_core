@@ -47,4 +47,22 @@ void main() {
           isNot(equals(ApiRoutes.bulkOrdersDone)));
     });
   });
+
+  // 상태 변경 경로와 프리픽스가 같아서(`/v0/order/{id}`) 오타 하나면 상태 변경
+  // PUT 으로 흘러갈 수 있다. 접미사까지 고정한다.
+  group('ApiRoutes 픽업 재요청', () {
+    const orderNo = '202608310001234567';
+
+    test('orderPickupNoti — 알림 발송 (상태는 안 바뀐다)', () {
+      expect(ApiRoutes.orderPickupNoti(orderNo),
+          '/v0/order/202608310001234567/pickup-noti');
+    });
+
+    test('상태 변경 경로의 하위 경로이되 같지는 않다', () {
+      expect(ApiRoutes.orderPickupNoti(orderNo),
+          startsWith(ApiRoutes.orderUpdate(orderNo)));
+      expect(ApiRoutes.orderPickupNoti(orderNo),
+          isNot(equals(ApiRoutes.orderUpdate(orderNo))));
+    });
+  });
 }

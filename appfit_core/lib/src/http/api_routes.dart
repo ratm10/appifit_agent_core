@@ -44,6 +44,17 @@ class ApiRoutes {
   // 접수/픽업요청/완료 액션. v1 미제공이라 v0 유지.
   static String orderUpdate(String orderId) => '$version/order/$orderId';
 
+  /// 픽업 준비가 끝난(READY) 주문의 고객에게 재요청 알림을 발송한다.
+  ///
+  /// **주문 상태를 바꾸지 않는다** — [orderUpdate] 계열과 달리 성공해도 주문은
+  /// READY 로 남는다. 알림 발송만 하는 사이드 액션이라, 호출부는 화면에서 주문이
+  /// 사라지는 것을 성공 신호로 삼을 수 없다. READY 가 아니면 409.
+  ///
+  /// POST, body 는 `{message?}` (200자 제한, 생략하면 서버 기본 문구).
+  /// v1 미제공이라 v0 유지.
+  static String orderPickupNoti(String orderId) =>
+      '$version/order/$orderId/pickup-noti';
+
   // 아래 3개만 v1. 목록/취소는 응답 스키마가 v0 과 동일하고, 상세만
   // OrderDetailV1Response 로 달라진다(옵션에 optionGroupPosId 가 실려 라벨
   // sub-info 분류의 정본이 된다).
