@@ -17,8 +17,15 @@ class AppFitDeviceInfo {
   final String appVersion;
   final String buildNumber;
 
-  /// Windows 전용(MachineGuid). 다른 플랫폼에서는 null —
-  /// [FleetIdentityResolver] 가 식별자 후보로 소비한다.
+  /// Windows 전용(`HKLM\SOFTWARE\Microsoft\SQMClient\MachineId`). 다른
+  /// 플랫폼에서는 null. **진단 표시용**이다.
+  ///
+  /// ⚠️ **식별자로 쓰지 말 것.** 하드웨어 파생값이 아니라 OS 설치 이미지에
+  /// 박혀 있는 값이라, sysprep 없이 복제 배포된 PC 들은 이 값이 전부 같다.
+  /// 실제로 서로 다른 매장의 두 POS 가 같은 값을 보고해 D1 의 기기 행 하나를
+  /// 번갈아 덮어쓴 사고가 있었다(경위는 appfit_order_agent 의
+  /// docs/DEVICE_MONITORING.md). 식별자는 [FleetIdentityResolver] 가
+  /// 시리얼/설치 UUID 로만 조달한다.
   final String? windowsMachineGuid;
 
   const AppFitDeviceInfo({

@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:appfit_core/src/device/device_probe.dart';
 import 'package:appfit_core/src/logging/appfit_logger.dart';
 
 /// [FleetIdentity.idSource] 값 상수. 기존 와이어값(order_agent 정본)과 동일하게
@@ -11,6 +10,11 @@ class FleetIdSources {
   FleetIdSources._();
 
   static const String serial = 'serial';
+
+  /// **레거시.** core 는 더 이상 이 값을 생성하지 않는다(Windows MachineGuid 를
+  /// 식별자로 쓰던 시절의 값). D1 에 이 값으로 기록된 기기 행이 아직 남아 있어
+  /// 대시보드가 읽으므로 상수는 지우지 않는다. 사유는
+  /// [DefaultFleetIdentityResolver.resolve] 의 2단계 주석.
   static const String deviceId = 'deviceId';
   static const String installId = 'installId';
   static const String custom = 'custom';
@@ -78,14 +82,14 @@ class PrefsFleetIdentityStore implements FleetIdentityStore {
 typedef FleetNativeSerialReader = Future<String?> Function();
 
 /// 기본 식별자 해석기. 우선순위: 시리얼(캐시 우선, 없으면 [nativeSerial] 1회
-/// 조회 후 영속) > Windows MachineGuid > 설치 UUID(생성 후 영속).
+/// 조회 후 영속) > 설치 UUID(생성 후 영속). **Windows 는 항상 설치 UUID 다** —
+/// 기기 정보를 아예 읽지 않는다(사유는 [resolve] 의 2단계 주석).
 ///
 /// ⚠️ 시리얼은 반드시 영속 캐시해야 한다. 캐시가 없으면 부팅 시 네이티브 호출
 /// 1회 실패만으로 그 부팅이 installId 로 떨어지고, 이후 시리얼을 되찾아도
 /// D1 은 `(app_type, device_id)` 를 PK 로 쓰므로 이미 만들어진 행은 영구
 /// 유령으로 남는다. 이 클래스가 그 캐시를 구조로 강제한다.
 class DefaultFleetIdentityResolver implements FleetIdentityResolver {
-  final AppFitDeviceProbe _probe;
   final FleetIdentityStore _store;
   final FleetNativeSerialReader? _nativeSerial;
   final AppFitLogger? _logger;
@@ -94,13 +98,11 @@ class DefaultFleetIdentityResolver implements FleetIdentityResolver {
   FleetIdentity? _cached;
 
   DefaultFleetIdentityResolver({
-    required AppFitDeviceProbe probe,
     FleetIdentityStore? store,
     FleetNativeSerialReader? nativeSerial,
     AppFitLogger? logger,
     Random? random,
-  })  : _probe = probe,
-        _store = store ?? PrefsFleetIdentityStore(),
+  })  : _store = store ?? PrefsFleetIdentityStore(),
         _nativeSerial = nativeSerial,
         _logger = logger,
         _random = random ?? Random.secure();
@@ -135,17 +137,15 @@ class DefaultFleetIdentityResolver implements FleetIdentityResolver {
       }
     }
 
-    // 2) Windows MachineGuid.
-    if (candidate == null) {
-      final device = await _probe.read();
-      final guid = device.windowsMachineGuid;
-      if (guid != null && guid.isNotEmpty) {
-        candidate = guid;
-        source = FleetIdSources.deviceId;
-      }
-    }
-
-    // 3) fallback: 설치 UUID(생성 후 영속).
+    // 2) 설치 UUID — 시리얼 실패 시 폴백이자, **Windows 의 유일한 경로**.
+    //
+    // ⚠️ Windows MachineGuid 를 여기에 다시 끼워 넣지 말 것.
+    // device_info_plus 의 WindowsDeviceInfo.deviceId 는 레지스트리
+    // HKLM\SOFTWARE\Microsoft\SQMClient\MachineId 를 그대로 읽은 값이고,
+    // 하드웨어 파생값이 아니다. sysprep 없이 디스크 이미지를 복제해 배포한
+    // POS 들은 이 값이 전부 같아서, 서로 다른 매장의 두 기기가 D1 의
+    // PK (app_type, device_id) 한 행을 번갈아 덮어쓴다.
+    // 실사고 경위는 appfit_order_agent 의 docs/DEVICE_MONITORING.md.
     final String deviceId;
     if (candidate != null && candidate.isNotEmpty) {
       deviceId = candidate;

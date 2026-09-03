@@ -3,7 +3,47 @@
 본 패키지는 AppFit 매장 운영 앱 군(KDS, DID 디스플레이, 향후 POS 등)이 공유하는 인프라
 SDK 입니다. 각 릴리스는 두 소비자 앱(appfit_order_agent, did)에 동시 영향을 줍니다.
 
-## v1.3.0 (현재) — 매장 카탈로그 중첩 조회 경로 추가
+## v1.6.0 (현재) — Windows 식별자에서 MachineGuid 제거
+
+**⚠️ 소스 호환 깨짐: `DefaultFleetIdentityResolver` 생성자에서 `probe` 파라미터를
+제거했습니다.** 이 클래스를 직접 만드는 코드는 인자만 지우면 됩니다(`FleetKit`
+경유 사용자는 영향 없음 — 파사드가 흡수합니다). MAJOR 가 아닌 이유는 소비 앱에
+직접 생성 지점이 하나도 없어서입니다.
+
+### 배경 — 두 매장이 한 기기 행을 나눠 쓰고 있었다
+
+`DefaultFleetIdentityResolver` 는 Windows 식별자로 `AppFitDeviceInfo.windowsMachineGuid`
+(= `HKLM\SOFTWARE\Microsoft\SQMClient\MachineId`)를 썼습니다. 이 값은 하드웨어
+파생값이 아니라 **OS 설치 이미지에 박혀 있는 값**이라, sysprep 없이 디스크
+이미지를 복제해 배포한 POS 들은 전부 같은 값을 갖습니다.
+
+2026-09-03 운영에서 서로 다른 두 매장의 Windows POS 가 같은
+`{B4496514-...}` 로 보고해, D1 의 PK `(app_type, device_id)` 한 행을 30초마다
+번갈아 덮어썼습니다. 관제 데이터가 무의미해지고, 한 매장은 대시보드에서
+사라지고, 원격 명령이 엉뚱한 매장 기기로 배달돼 대상 검증에서 거부됐습니다.
+자세한 경위는 `appfit_order_agent/docs/DEVICE_MONITORING.md`.
+
+### Changed
+- `DefaultFleetIdentityResolver.resolve()` 의 우선순위가
+  **시리얼 > 설치 UUID** 2단이 됐다. Windows 는 기기 정보를 아예 읽지 않고 항상
+  설치 UUID 를 쓴다 — 유일성이 `Random.secure` 로 코드에서 보장된다.
+- `DefaultFleetIdentityResolver` 가 `AppFitDeviceProbe` 에 의존하지 않는다.
+  "기기 정보 조회 실패가 식별자까지 흔든다" 는 결합이 사라졌고, `FleetKit` 이
+  `PlatformDeviceProbe` 를 두 번 만들던 중복도 해소됐다.
+- `AppFitDeviceInfo.windowsMachineGuid` 는 **유지**하되 용도를 진단 표시용으로
+  한정하고, doc 에 식별자 사용 금지 경고를 붙였다. 기존 doc 이 "식별자 후보로
+  소비한다" 였어서 그대로 두면 같은 버그를 다시 부른다.
+- `FleetIdSources.deviceId` 상수도 **유지**한다. core 는 더 이상 생성하지 않지만
+  D1 에 이 값으로 기록된 행이 남아 있어 대시보드가 읽는다.
+
+### Notes
+- 소비 앱은 ref 를 올린 뒤 **Windows 기기가 새 device_id 로 재등록**된다. 구
+  device 행은 고아가 되므로 롤아웃 완료 후 정리해야 한다.
+- `appfit_order_agent` 는 이 resolver 가 아니라 자체
+  `DeviceIdentityService` 를 쓴다. 같은 변경을 그쪽에도 적용했다 — 사다리가
+  두 곳에 중복 구현돼 있어 한쪽만 고치면 갈라진다.
+
+## v1.3.0 — 매장 카탈로그 중첩 조회 경로 추가
 
 `appfit_order_agent` 의 상품 조회가 `/v0/shops/{shopCode}/categories` 에서
 `/categories/items` 로 옮겨갔다. 소비자 앱이 경로 문자열을 직접 조립하고 있어

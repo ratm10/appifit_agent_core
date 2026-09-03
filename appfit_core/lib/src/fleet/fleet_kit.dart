@@ -75,11 +75,13 @@ class FleetKit with WidgetsBindingObserver {
         ),
         _identity = identity ??
             DefaultFleetIdentityResolver(
-              probe: deviceProbe ?? PlatformDeviceProbe(logger: logger),
               store: identityStore,
               nativeSerial: nativeSerial,
               logger: logger,
             ) {
+    // 식별자 해석기는 probe 를 쓰지 않는다 — [deviceProbe] 는 스냅샷 조립
+    // (정적 기기정보) 전용이다. 둘을 엮으면 기기정보 조회 실패가 식별자까지
+    // 흔든다.
     final probe = deviceProbe ?? PlatformDeviceProbe(logger: logger);
     final destination = sink ??
         (baseUrl.isNotEmpty && deviceKey.isNotEmpty
